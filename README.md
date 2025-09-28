@@ -72,9 +72,7 @@ GenerateDownloadURL/
 | `JWT_SECRET`                        | JWT 签名密钥                                                                                  |
 | `JWT_EXP_MINUTES`                   | 登录 Token 有效期（分钟，默认 60）                                                            |
 | `CORS_ALLOWED_ORIGINS`              | 允许的前端来源（逗号分隔，如 `https://gurl.honahec.cc,http://localhost:5173`）                |
-| `API_HOST` / `API_PORT`             | 监听地址与端口（默认 `0.0.0.0:8080`）                                                         |
-
-> ⚠️ 当前实现将下载令牌保存在内存中，进程重启后会失效。如需持久化，可接入 Redis / 数据库。
+| `API_HOST` / `API_PORT`             | 监听地址与端口（默认 `0.0.0.0:8003`）                                                         |
 
 ### 运行
 
