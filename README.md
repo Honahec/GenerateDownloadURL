@@ -72,9 +72,7 @@ GenerateDownloadURL/
 | `JWT_SECRET`                        | JWT 签名密钥                                                                                  |
 | `JWT_EXP_MINUTES`                   | 登录 Token 有效期（分钟，默认 60）                                                            |
 | `CORS_ALLOWED_ORIGINS`              | 允许的前端来源（逗号分隔，如 `https://gurl.honahec.cc,http://localhost:5173`）                |
-| `API_HOST` / `API_PORT`             | 监听地址与端口（默认 `0.0.0.0:8080`）                                                         |
-
-> ⚠️ 当前实现将下载令牌保存在内存中，进程重启后会失效。如需持久化，可接入 Redis / 数据库。
+| `API_HOST` / `API_PORT`             | 监听地址与端口（默认 `0.0.0.0:8003`）                                                         |
 
 ### 运行
 
@@ -148,90 +146,6 @@ sudo ./ssl-setup.sh
 - 构建前后端应用
 - 创建系统服务（systemctl）
 - 配置 Nginx 反向代理
-- 设置防火墙规则
-- 创建专用服务用户
-
-**部署后管理：**
-
-```bash
-# 使用管理脚本
-sudo chmod +x manage.sh
-
-# 查看服务状态
-sudo ./manage.sh status
-
-# 查看服务日志
-sudo ./manage.sh logs
-
-# 重启服务
-sudo ./manage.sh restart
-
-# 备份数据库
-sudo ./manage.sh backup
-
-# 更新服务
-sudo ./manage.sh update
-
-# 更多命令
-sudo ./manage.sh help
-```
-
-## 部署架构
-
-### 分离式部署（推荐）
-
-**手动部署（高级用户）**
-
-如果需要手动部署，参考以下步骤：
-
-```bash
-# 1. 部署后端到服务器
-cd backend
-cargo build --release
-./target/release/backend
-
-# 2. 自动部署的 Nginx 配置示例
-# 前端域名配置 - 处理管理功能API
-server {
-    listen 443 ssl;
-    server_name gurl.honahec.cc;
-
-    # 静态文件服务
-    location / {
-        root /path/to/frontend/dist;
-        try_files $uri $uri/ /index.html;
-    }
-
-    # 管理功能API路由代理到后端
-    location /login {
-        proxy_pass http://127.0.0.1:8003/login;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-
-    location /sign {
-        proxy_pass http://127.0.0.1:8003/sign;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-
-    location /links {
-        proxy_pass http://127.0.0.1:8003/links;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-}# 后端域名配置 - 处理下载重定向
-server {
-    listen 443 ssl;
-    server_name api.honahec.cc;
-
-    location /download/ {
-        proxy_pass http://127.0.0.1:8003/download/;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-}
-```
 
 ### 域名配置要点
 
