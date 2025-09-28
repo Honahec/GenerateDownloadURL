@@ -62,6 +62,8 @@ where
     async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
         use axum::extract::State;
 
+        println!("Auth check for path: {}", parts.uri.path());
+
         let State(app_state) = State::<AppState>::from_request_parts(parts, state)
             .await
             .map_err(|_| AuthError::MissingState)?;
@@ -70,19 +72,29 @@ where
             .headers
             .get(header::AUTHORIZATION)
             .and_then(|value| value.to_str().ok())
-            .ok_or(AuthError::MissingToken)?;
+            .ok_or_else(|| {
+                println!("Missing authorization header for path: {}", parts.uri.path());
+                AuthError::MissingToken
+            })?;
 
         let token = auth_header
             .strip_prefix("Bearer ")
-            .ok_or(AuthError::InvalidFormat)?;
+            .ok_or_else(|| {
+                println!("Invalid auth format for path: {}", parts.uri.path());
+                AuthError::InvalidFormat
+            })?;
 
         let decoded = decode::<Claims>(
             token,
             &DecodingKey::from_secret(app_state.config.jwt_secret.as_bytes()),
             &Validation::default(),
         )
-        .map_err(|_| AuthError::InvalidToken)?;
+        .map_err(|e| {
+            println!("Invalid token for path {}: {}", parts.uri.path(), e);
+            AuthError::InvalidToken
+        })?;
 
+        println!("Auth successful for user: {} on path: {}", decoded.claims.sub, parts.uri.path());
         Ok(Self {
             username: decoded.claims.sub,
         })
