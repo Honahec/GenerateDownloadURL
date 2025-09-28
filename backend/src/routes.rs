@@ -156,19 +156,24 @@ async fn create_signed_link(
     };
 
     // 存储到数据库
+    println!("Creating download link: id={}, object_key={}", id, payload.object_key);
     state
         .database
         .create_download_link(
             id,
-            payload.object_key,
-            payload.bucket,
+            payload.object_key.clone(),
+            payload.bucket.clone(),
             expires_at,
             payload.max_downloads,
-            payload.download_filename,
-            payload.endpoint,
+            payload.download_filename.clone(),
+            payload.endpoint.clone(),
         )
         .await
-        .map_err(|e| ApiError::Internal(format!("Database error: {}", e)))?;
+        .map_err(|e| {
+            eprintln!("Failed to create download link: {}", e);
+            ApiError::Internal(format!("Database error: {}", e))
+        })?;
+    println!("Successfully created download link: {}", id);
 
     // 存储票据到内存
     {
@@ -258,11 +263,16 @@ async fn list_links(
     Query(params): Query<ListLinksQuery>,
     State(state): State<AppState>,
 ) -> Result<Json<ListLinksResponse>, ApiError> {
+    println!("Listing links with limit={:?}, offset={:?}", params.limit, params.offset);
     let links = state
         .database
         .list_download_links(params.limit, params.offset)
         .await
-        .map_err(|e| ApiError::Internal(format!("Database error: {}", e)))?;
+        .map_err(|e| {
+            eprintln!("Failed to list links: {}", e);
+            ApiError::Internal(format!("Database error: {}", e))
+        })?;
+    println!("Found {} links in database", links.len());
 
     let download_links: Vec<DownloadLinkResponse> = links
         .into_iter()
