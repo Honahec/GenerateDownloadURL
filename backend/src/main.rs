@@ -39,16 +39,14 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     // 处理数据库 URL，确保使用绝对路径
-    let adjusted_url = if database_url.starts_with("sqlite:backend/") {
-        let current_dir = std::env::current_dir()?;
-        let db_path = current_dir.join("data").join("downloads.db");
-        format!("sqlite:{}", db_path.to_string_lossy())
-    } else if database_url.starts_with("sqlite:data/") {
+    let adjusted_url = if database_url.starts_with("sqlite:") && !database_url.starts_with("sqlite:/") {
+        // 相对路径，需要转换为绝对路径
         let current_dir = std::env::current_dir()?;
         let relative_path = database_url.strip_prefix("sqlite:").unwrap();
         let db_path = current_dir.join(relative_path);
         format!("sqlite:{}", db_path.to_string_lossy())
     } else {
+        // 已经是绝对路径或其他格式，直接使用
         database_url
     };
 
