@@ -9,6 +9,7 @@ export interface CreateLinkRequest {
   expires_in_seconds?: number;
   max_downloads?: number;
   download_filename?: string;
+  endpoint?: string;
 }
 
 export interface CreateLinkResponse {
@@ -27,6 +28,7 @@ export interface DownloadLinkResponse {
   downloads_served: number;
   created_at: string;
   download_filename?: string;
+  endpoint?: string;
   is_expired: boolean;
   download_url: string;
 }

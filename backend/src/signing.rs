@@ -36,6 +36,7 @@ pub fn build_signed_url(
     object_key: &str,
     expires_at: DateTime<Utc>,
     download_filename: Option<&str>,
+    endpoint_override: Option<&str>,
 ) -> Result<SignedUrl, SigningError> {
     let bucket = bucket_override
         .map(|value| value.to_string())
@@ -70,7 +71,10 @@ pub fn build_signed_url(
     let signature = mac.finalize().into_bytes();
     let signature_b64 = BASE64_ENGINE.encode(signature);
 
-    let host = build_oss_host(&bucket, &config.aliyun_endpoint);
+    let endpoint = endpoint_override
+        .map(|e| e.to_string())
+        .unwrap_or_else(|| config.aliyun_default_endpoint.clone());
+    let host = build_oss_host(&bucket, &endpoint);
     let access_key_encoded =
         percent_encode(config.aliyun_access_key_id.as_bytes(), NON_ALPHANUMERIC).to_string();
     let signature_encoded = percent_encode(signature_b64.as_bytes(), NON_ALPHANUMERIC).to_string();

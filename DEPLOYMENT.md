@@ -50,7 +50,7 @@ sudo nano /opt/generate-download-url/backend/.env
 ```bash
 ALIYUN_ACCESS_KEY_ID=your_access_key_id
 ALIYUN_ACCESS_KEY_SECRET=your_access_key_secret
-ALIYUN_ENDPOINT=oss-cn-hangzhou.aliyuncs.com
+ALIYUN_DEFAULT_ENDPOINT=oss-cn-hangzhou.aliyuncs.com
 ALIYUN_DEFAULT_BUCKET=your_bucket_name
 JWT_SECRET=your-secure-random-jwt-secret
 ADMIN_USERNAME=admin

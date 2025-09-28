@@ -74,6 +74,7 @@ pub struct CreateLinkRequest {
     pub expires_in_seconds: i64,
     pub max_downloads: Option<u32>,
     pub download_filename: Option<String>,
+    pub endpoint: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -106,6 +107,7 @@ pub struct DownloadLinkResponse {
     pub downloads_served: i64,
     pub created_at: String,
     pub download_filename: Option<String>,
+    pub endpoint: Option<String>,
     pub is_expired: bool,
     pub download_url: String,
 }
@@ -150,6 +152,7 @@ async fn create_signed_link(
         downloads_served: 0,
         created_at: Utc::now(),
         download_filename: payload.download_filename.clone(),
+        endpoint_override: payload.endpoint.clone(),
     };
 
     // 存储到数据库
@@ -162,6 +165,7 @@ async fn create_signed_link(
             expires_at,
             payload.max_downloads,
             payload.download_filename,
+            payload.endpoint,
         )
         .await
         .map_err(|e| ApiError::Internal(format!("Database error: {}", e)))?;
@@ -236,6 +240,7 @@ async fn resolve_download(
         &ticket.object_key,
         ticket.expires_at,
         ticket.download_filename.as_deref(),
+        ticket.endpoint_override.as_deref(),
     )
     .map_err(|_| {
         (
@@ -270,6 +275,7 @@ async fn list_links(
             downloads_served: link.downloads_served,
             created_at: link.created_at.to_rfc3339(),
             download_filename: link.download_filename,
+            endpoint: link.endpoint,
             is_expired: link.is_expired,
             download_url: format!(
                 "{}/{}",
@@ -307,6 +313,7 @@ async fn get_link_info(
         downloads_served: link.downloads_served,
         created_at: link.created_at.to_rfc3339(),
         download_filename: link.download_filename,
+        endpoint: link.endpoint,
         is_expired: link.is_expired,
         download_url: format!(
             "{}/{}",

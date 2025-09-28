@@ -54,6 +54,7 @@ interface LinkFormState {
   expiresInMinutes: number;
   maxDownloads?: number;
   downloadFilename: string;
+  endpoint: string;
 }
 
 const initialLoginState: LoginFormState = {
@@ -67,6 +68,7 @@ const initialLinkFormState: LinkFormState = {
   expiresInMinutes: 60,
   maxDownloads: undefined,
   downloadFilename: "",
+  endpoint: "",
 };
 
 const App = () => {
@@ -209,6 +211,9 @@ const App = () => {
         }
         if (linkForm.downloadFilename.trim()) {
           payload.download_filename = linkForm.downloadFilename.trim();
+        }
+        if (linkForm.endpoint.trim()) {
+          payload.endpoint = linkForm.endpoint.trim();
         }
         if (enforceLimit) {
           if (!linkForm.maxDownloads || linkForm.maxDownloads <= 0) {
@@ -367,13 +372,23 @@ const App = () => {
       </Flex>
       <VStack spacing={5} align="stretch">
         <FormControl>
-          <FormLabel>Bucket（可选）</FormLabel>
+          <FormLabel>Bucket</FormLabel>
           <Input
             value={linkForm.bucket}
             onChange={(e) =>
               setLinkForm((prev) => ({ ...prev, bucket: e.target.value }))
             }
             placeholder="可选，使用后端默认 bucket"
+          />
+        </FormControl>
+        <FormControl>
+          <FormLabel>OSS Endpoint</FormLabel>
+          <Input
+            value={linkForm.endpoint}
+            onChange={(e) =>
+              setLinkForm((prev) => ({ ...prev, endpoint: e.target.value }))
+            }
+            placeholder="可选，使用后端默认 endpoint"
           />
         </FormControl>
         <FormControl isRequired>

@@ -6,6 +6,11 @@ export const API_CONFIG = {
     : "http://localhost:8003",
   // 下载链接基础URL（后端会直接返回完整的下载URL）
   DOWNLOAD_BASE: "https://api.honahec.cc",
+  // 阿里云OSS默认Endpoint
+  DEFAULT_ALIYUN_DEFAULT_ENDPOINT:
+    import.meta.env.VITE_ALIYUN_DEFAULT_ENDPOINT ||
+    "oss-cn-shanghai.aliyuncs.com",
+  DEFAULT_ALIYUN_DEFAULT_BUCKET: import.meta.env.VITE_ALIYUN_DEFAULT_BUCKET,
 };
 
 export default API_CONFIG;

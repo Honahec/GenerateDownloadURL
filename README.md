@@ -63,7 +63,7 @@ GenerateDownloadURL/
 | ----------------------------------- | --------------------------------------------------------------------------------------------- |
 | `ALIYUN_ACCESS_KEY_ID`              | 阿里云 AccessKey ID                                                                           |
 | `ALIYUN_ACCESS_KEY_SECRET`          | 阿里云 AccessKey Secret（建议仅授予只读权限）                                                 |
-| `ALIYUN_ENDPOINT`                   | OSS Endpoint（如 `oss-cn-hangzhou.aliyuncs.com`，也支持 `https://{bucket}.example.com` 模板） |
+| `ALIYUN_DEFAULT_ENDPOINT`           | OSS Endpoint（如 `oss-cn-hangzhou.aliyuncs.com`，也支持 `https://{bucket}.example.com` 模板） |
 | `ALIYUN_DEFAULT_BUCKET`             | 默认 Bucket 名（可在前端覆盖）                                                                |
 | `DEFAULT_EXPIRY_SECS`               | 默认链接有效期（秒，默认 3600）                                                               |
 | `PUBLIC_BASE_URL`                   | 对外访问的域名根（如 `https://api.honahec.cc`，生成的下载地址基于此）                         |

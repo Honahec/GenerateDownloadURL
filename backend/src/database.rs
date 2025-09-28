@@ -19,6 +19,7 @@ pub struct DownloadLink {
     pub downloads_served: i64,
     pub created_at: DateTime<Utc>,
     pub download_filename: Option<String>,
+    pub endpoint: Option<String>,
     pub is_expired: bool,
 }
 
@@ -68,6 +69,7 @@ impl Database {
         expires_at: DateTime<Utc>,
         max_downloads: Option<u32>,
         download_filename: Option<String>,
+        endpoint: Option<String>,
     ) -> Result<()> {
         let expires_at_str = expires_at.to_rfc3339();
         let created_at_str = Utc::now().to_rfc3339();
@@ -75,8 +77,8 @@ impl Database {
 
         sqlx::query(
             r#"
-            INSERT INTO download_links (id, object_key, bucket, expires_at, max_downloads, downloads_served, created_at, download_filename)
-            VALUES (?, ?, ?, ?, ?, 0, ?, ?)
+            INSERT INTO download_links (id, object_key, bucket, expires_at, max_downloads, downloads_served, created_at, download_filename, endpoint)
+            VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?)
             "#
         )
         .bind(id.to_string())
@@ -86,6 +88,7 @@ impl Database {
         .bind(max_downloads_i64)
         .bind(created_at_str)
         .bind(download_filename)
+        .bind(endpoint)
         .execute(&self.pool)
         .await?;
 
@@ -94,7 +97,7 @@ impl Database {
 
     pub async fn get_download_link(&self, id: &str) -> Result<Option<DownloadLink>> {
         let row = sqlx::query(
-            "SELECT id, object_key, bucket, expires_at, max_downloads, downloads_served, created_at, download_filename FROM download_links WHERE id = ?"
+            "SELECT id, object_key, bucket, expires_at, max_downloads, downloads_served, created_at, download_filename, endpoint FROM download_links WHERE id = ?"
         )
         .bind(id)
         .fetch_optional(&self.pool)
@@ -123,6 +126,7 @@ impl Database {
                 downloads_served,
                 created_at,
                 download_filename: row.get("download_filename"),
+                endpoint: row.get("endpoint"),
                 is_expired,
             }))
         } else {
@@ -150,7 +154,7 @@ impl Database {
         let offset = offset.unwrap_or(0);
 
         let rows = sqlx::query(
-            "SELECT id, object_key, bucket, expires_at, max_downloads, downloads_served, created_at, download_filename 
+            "SELECT id, object_key, bucket, expires_at, max_downloads, downloads_served, created_at, download_filename, endpoint 
              FROM download_links 
              ORDER BY created_at DESC 
              LIMIT ? OFFSET ?"
@@ -185,6 +189,7 @@ impl Database {
                 downloads_served,
                 created_at,
                 download_filename: row.get("download_filename"),
+                endpoint: row.get("endpoint"),
                 is_expired,
             });
         }

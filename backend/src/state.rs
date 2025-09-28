@@ -36,4 +36,5 @@ pub struct DownloadTicket {
     #[allow(dead_code)]
     pub created_at: DateTime<Utc>,
     pub download_filename: Option<String>,
+    pub endpoint_override: Option<String>,
 }

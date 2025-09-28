@@ -11,7 +11,7 @@ pub struct AppConfig {
     pub download_prefix: String,
     pub aliyun_access_key_id: String,
     pub aliyun_access_key_secret: String,
-    pub aliyun_endpoint: String,
+    pub aliyun_default_endpoint: String,
     pub aliyun_default_bucket: Option<String>,
     pub default_expiry_secs: i64,
     pub jwt_secret: String,
@@ -42,7 +42,9 @@ impl AppConfig {
 
         let aliyun_access_key_id = require_env("ALIYUN_ACCESS_KEY_ID")?;
         let aliyun_access_key_secret = require_env("ALIYUN_ACCESS_KEY_SECRET")?;
-        let aliyun_endpoint = require_env("ALIYUN_ENDPOINT")?;
+        let aliyun_default_endpoint = env::var("ALIYUN_DEFAULT_ENDPOINT")
+            .ok()
+            .filter(|s| !s.is_empty());
         let aliyun_default_bucket = env::var("ALIYUN_DEFAULT_BUCKET")
             .ok()
             .filter(|s| !s.is_empty());
@@ -64,7 +66,7 @@ impl AppConfig {
             download_prefix,
             aliyun_access_key_id,
             aliyun_access_key_secret,
-            aliyun_endpoint,
+            aliyun_default_endpoint,
             aliyun_default_bucket,
             default_expiry_secs,
             jwt_secret,

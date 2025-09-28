@@ -97,7 +97,7 @@ configure_project() {
         log_warn "请编辑 $PROJECT_DIR/backend/.env 文件，配置以下必要参数："
         echo "  - ALIYUN_ACCESS_KEY_ID"
         echo "  - ALIYUN_ACCESS_KEY_SECRET"
-        echo "  - ALIYUN_ENDPOINT"
+        echo "  - ALIYUN_DEFAULT_ENDPOINT"
         echo "  - ALIYUN_DEFAULT_BUCKET"
         echo "  - JWT_SECRET (请设置为安全的随机字符串)"
         echo "  - ADMIN_USERNAME"
