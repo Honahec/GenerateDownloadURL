@@ -52,6 +52,14 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         database_url
     };
 
+    // 确保数据库目录存在
+    if let Some(db_path) = adjusted_url.strip_prefix("sqlite:") {
+        let path = std::path::Path::new(db_path);
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+    }
+
     let database = Database::new(&adjusted_url).await?;
 
     let state = AppState::new(config, database);

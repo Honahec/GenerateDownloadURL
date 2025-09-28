@@ -51,7 +51,7 @@ pub fn build_signed_url(
 
     let canonical_resource = format!("/{}/{}", bucket, encoded_key);
     let mut additional_query = String::new();
-    let mut canonical_query_string = String::new();
+    let canonical_oss_headers = String::new();
     
     if let Some(filename) = download_filename {
         if !filename.trim().is_empty() {
@@ -60,19 +60,12 @@ pub fn build_signed_url(
             let encoded_disposition =
                 percent_encode(disposition.as_bytes(), NON_ALPHANUMERIC).to_string();
             additional_query = format!("&response-content-disposition={}", encoded_disposition);
-            // 对于签名，子资源查询参数需要单独处理
-            canonical_query_string = format!("?response-content-disposition={}", encoded_disposition);
         }
     }
 
-    // 签名字符串中的canonical_resource应该包含子资源查询参数
-    let signing_canonical_resource = if canonical_query_string.is_empty() {
-        canonical_resource.clone()
-    } else {
-        format!("{}{}", canonical_resource, canonical_query_string)
-    };
-
-    let string_to_sign = format!("GET\n\n\n{}\n{}", expires, signing_canonical_resource);
+    // 根据阿里云OSS签名规范构建字符串
+    // StringToSign = VERB + "\n" + CONTENT-MD5 + "\n" + CONTENT-TYPE + "\n" + EXPIRES + "\n" + CanonicalizedOSSHeaders + CanonicalizedResource
+    let string_to_sign = format!("GET\n\n\n{}\n{}{}", expires, canonical_oss_headers, canonical_resource);
 
     let mut mac = HmacSha1::new_from_slice(config.aliyun_access_key_secret.as_bytes())
         .map_err(|_| SigningError::SigningFailure)?;
