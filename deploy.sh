@@ -33,6 +33,36 @@ check_root() {
     fi
 }
 
+# 检查系统环境
+check_system() {
+    log_info "检查系统环境..."
+    
+    # 检查是否为 Debian/Ubuntu 系统
+    if [ ! -f /etc/debian_version ]; then
+        log_warn "此脚本专为 Debian/Ubuntu 系统设计，其他系统可能需要调整"
+    fi
+    
+    # 检查必要命令是否存在
+    local missing_commands=()
+    
+    if ! command -v apt &> /dev/null; then
+        missing_commands+=("apt")
+    fi
+    
+    if ! command -v useradd &> /dev/null && ! command -v adduser &> /dev/null; then
+        missing_commands+=("useradd/adduser")
+    fi
+    
+    if [ ${#missing_commands[@]} -gt 0 ]; then
+        log_error "缺少必要命令: ${missing_commands[*]}"
+        log_info "请先安装必要的包："
+        log_info "  apt update && apt install -y passwd adduser"
+        exit 1
+    fi
+    
+    log_info "系统环境检查完成"
+}
+
 # 安装系统依赖
 install_dependencies() {
     log_info "更新系统包..."
@@ -79,7 +109,18 @@ configure_project() {
     # 创建服务用户
     if ! id "$SERVICE_USER" &>/dev/null; then
         log_info "创建服务用户 $SERVICE_USER..."
-        useradd --system --home $PROJECT_DIR --shell /bin/false $SERVICE_USER
+        if command -v useradd &> /dev/null; then
+            useradd --system --home $PROJECT_DIR --shell /bin/false $SERVICE_USER
+        elif command -v adduser &> /dev/null; then
+            adduser --system --home $PROJECT_DIR --shell /bin/false --no-create-home $SERVICE_USER
+        else
+            log_error "无法找到 useradd 或 adduser 命令"
+            log_info "请安装必要的包: apt install -y passwd adduser"
+            exit 1
+        fi
+        log_info "服务用户 $SERVICE_USER 创建成功"
+    else
+        log_info "服务用户 $SERVICE_USER 已存在"
     fi
 
     # 复制项目文件
@@ -88,24 +129,6 @@ configure_project() {
     chown -R $SERVICE_USER:$SERVICE_USER $PROJECT_DIR
 
     cd $PROJECT_DIR
-
-    # 配置环境变量
-    if [[ ! -f backend/.env ]]; then
-        log_info "创建环境配置文件..."
-        cp .env.example backend/.env
-        
-        log_warn "请编辑 $PROJECT_DIR/backend/.env 文件，配置以下必要参数："
-        echo "  - ALIYUN_ACCESS_KEY_ID"
-        echo "  - ALIYUN_ACCESS_KEY_SECRET"
-        echo "  - ALIYUN_DEFAULT_ENDPOINT"
-        echo "  - ALIYUN_DEFAULT_BUCKET"
-        echo "  - JWT_SECRET (请设置为安全的随机字符串)"
-        echo "  - ADMIN_USERNAME"
-        echo "  - ADMIN_PASSWORD"
-        
-        read -p "配置完成后按回车继续..." -n 1 -r
-        echo
-    fi
 }
 
 # 构建后端
@@ -119,15 +142,14 @@ build_backend() {
     # 设置 Rust 环境
     export PATH="$HOME/.cargo/bin:$PATH"
     
-    # 以服务用户身份构建
-    sudo -u $SERVICE_USER bash -c "
-        export PATH=\"$HOME/.cargo/bin:\$PATH\"
-        cd $PROJECT_DIR/backend
-        cargo build --release
-    "
+    # 构建后端（在 root 用户下构建，因为 Rust 安装在 root 用户环境中）
+    log_info "构建 Rust 后端..."
+    cd $PROJECT_DIR/backend
+    cargo build --release
     
-    # 确保二进制文件可执行
+    # 确保二进制文件可执行并设置正确的所有权
     chmod +x $PROJECT_DIR/backend/target/release/backend
+    chown $SERVICE_USER:$SERVICE_USER $PROJECT_DIR/backend/target/release/backend
 }
 
 # 构建前端
@@ -138,12 +160,13 @@ build_frontend() {
     log_info "构建 React 前端..."
     cd $PROJECT_DIR/frontend
     
-    # 以服务用户身份构建
-    sudo -u $SERVICE_USER bash -c "
-        cd $PROJECT_DIR/frontend
-        pnpm install
-        pnpm run build
-    "
+    # 构建前端（在 root 用户下构建，因为 Node.js/pnpm 安装在 root 用户环境中）
+    pnpm install
+    pnpm run build
+    
+    # 设置构建产物的正确所有权
+    chown -R $SERVICE_USER:$SERVICE_USER $PROJECT_DIR/frontend/dist
+    chown -R $SERVICE_USER:$SERVICE_USER $PROJECT_DIR/frontend/node_modules
 }
 
 # 创建 systemd 服务
@@ -400,6 +423,7 @@ main() {
     log_info "开始部署阿里云 OSS 签名下载链接项目..."
     
     check_root
+    check_system
     install_dependencies
     configure_project
     build_backend

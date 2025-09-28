@@ -20,6 +20,8 @@ pub enum SigningError {
     MissingBucket,
     #[error("HMAC signing error")]
     SigningFailure,
+    #[error("Endpoint is required when default endpoint is not configured")]
+    MissingEndpoint,
 }
 
 type HmacSha1 = Hmac<Sha1>;
@@ -73,7 +75,9 @@ pub fn build_signed_url(
 
     let endpoint = endpoint_override
         .map(|e| e.to_string())
-        .unwrap_or_else(|| config.aliyun_default_endpoint.clone());
+        .or_else(|| config.aliyun_default_endpoint.clone())
+        .ok_or(SigningError::MissingEndpoint)?;
+
     let host = build_oss_host(&bucket, &endpoint);
     let access_key_encoded =
         percent_encode(config.aliyun_access_key_id.as_bytes(), NON_ALPHANUMERIC).to_string();

@@ -11,7 +11,7 @@ pub struct AppConfig {
     pub download_prefix: String,
     pub aliyun_access_key_id: String,
     pub aliyun_access_key_secret: String,
-    pub aliyun_default_endpoint: String,
+    pub aliyun_default_endpoint: Option<String>,
     pub aliyun_default_bucket: Option<String>,
     pub default_expiry_secs: i64,
     pub jwt_secret: String,
