@@ -31,7 +31,6 @@ impl Database {
         let options = SqliteConnectOptions::from_str(database_url)?.create_if_missing(true);
         let pool = SqlitePool::connect_with(options).await?;
 
-        // 创建表
         sqlx::query(
             r#"
             CREATE TABLE IF NOT EXISTS download_links (
@@ -57,6 +56,12 @@ impl Database {
         sqlx::query("CREATE INDEX IF NOT EXISTS idx_download_links_created_at ON download_links(created_at)")
             .execute(&pool)
             .await?;
+
+        // 第二个迁移：添加 endpoint 列（如果不存在）
+        sqlx::query("ALTER TABLE download_links ADD COLUMN endpoint TEXT")
+            .execute(&pool)
+            .await
+            .ok(); // 忽略错误，因为列可能已经存在
 
         Ok(Self { pool })
     }
