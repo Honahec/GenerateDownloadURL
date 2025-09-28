@@ -10,7 +10,8 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::auth::{AuthUser, generate_token};
-use crate::signing::{SigningError, build_signed_url};
+use crate::oss_client::OssClient;
+use crate::oss_client::{build_signed_url, SigningError};
 use crate::state::{AppState, DownloadTicket};
 
 pub fn create_router(state: AppState) -> Router {
@@ -21,6 +22,8 @@ pub fn create_router(state: AppState) -> Router {
         // 前端域名路由 - gurl.honahec.cc (管理功能)
         .route("/login", post(login))
         .route("/sign", post(create_signed_link))
+        .route("/buckets", get(list_buckets))
+        .route("/objects", get(list_objects))
         .route("/links", get(list_links))
         .route("/links/:id", get(get_link_info))
         .route("/links/:id", axum::routing::delete(delete_link))
@@ -379,6 +382,48 @@ async fn cleanup_expired_links(
     });
 
     Ok(Json(CleanupResponse { deleted_count }))
+}
+
+async fn list_buckets(
+    _user: AuthUser,
+    State(state): State<AppState>,
+) -> Result<Json<crate::oss_client::ListBucketsResponse>, ApiError> {
+    let client = OssClient::new(state.config.as_ref())
+        .map_err(|e| ApiError::Internal(format!("Failed to create OSS client: {}", e)))?;
+    
+    let response = client
+        .list_buckets()
+        .await
+        .map_err(|e| ApiError::Internal(format!("Failed to list buckets: {}", e)))?;
+    
+    Ok(Json(response))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ListObjectsQuery {
+    pub bucket: String,
+    pub prefix: Option<String>,
+    pub marker: Option<String>,
+}
+
+async fn list_objects(
+    _user: AuthUser,
+    State(state): State<AppState>,
+    Query(query): Query<ListObjectsQuery>,
+) -> Result<Json<crate::oss_client::ListObjectsResponse>, ApiError> {
+    if query.bucket.is_empty() {
+        return Err(ApiError::BadRequest("Bucket name is required".to_string()));
+    }
+
+    let client = OssClient::new(state.config.as_ref())
+        .map_err(|e| ApiError::Internal(format!("Failed to create OSS client: {}", e)))?;
+    
+    let response = client
+        .list_objects(&query.bucket, query.prefix.as_deref(), query.marker.as_deref())
+        .await
+        .map_err(|e| ApiError::Internal(format!("Failed to list objects: {}", e)))?;
+    
+    Ok(Json(response))
 }
 
 #[derive(Debug)]

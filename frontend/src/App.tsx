@@ -20,6 +20,7 @@
   Link,
   NumberInput,
   NumberInputField,
+  Select,
   Spacer,
   Stack,
   Switch,
@@ -32,11 +33,15 @@ import { CopyIcon, DeleteIcon, RepeatIcon } from "@chakra-ui/icons";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import type {
+  Bucket,
   CreateLinkRequest,
   CreateLinkResponse,
   DownloadLinkResponse,
+  ListBucketsResponse,
   ListLinksResponse,
+  ListObjectsResponse,
   LoginResponse,
+  ObjectInfo,
 } from "./types";
 import { API_CONFIG } from "./config";
 
@@ -54,7 +59,6 @@ interface LinkFormState {
   expiresInMinutes: number;
   maxDownloads?: number;
   downloadFilename: string;
-  endpoint: string;
 }
 
 const initialLoginState: LoginFormState = {
@@ -68,7 +72,6 @@ const initialLinkFormState: LinkFormState = {
   expiresInMinutes: 60,
   maxDownloads: undefined,
   downloadFilename: "",
-  endpoint: "",
 };
 
 const App = () => {
@@ -86,6 +89,10 @@ const App = () => {
   const [linkToDelete, setLinkToDelete] = useState<DownloadLinkResponse | null>(
     null
   );
+  const [buckets, setBuckets] = useState<Bucket[]>([]);
+  const [isLoadingBuckets, setIsLoadingBuckets] = useState(false);
+  const [objects, setObjects] = useState<ObjectInfo[]>([]);
+  const [isLoadingObjects, setIsLoadingObjects] = useState(false);
 
   useEffect(() => {
     const storedToken = localStorage.getItem(TOKEN_STORAGE_KEY);
@@ -126,11 +133,63 @@ const App = () => {
     }
   }, [axiosInstance, authToken]);
 
+  const fetchBuckets = useCallback(async () => {
+    if (!authToken) return;
+    setIsLoadingBuckets(true);
+    try {
+      const response = await axiosInstance.get<ListBucketsResponse>("/buckets");
+      setBuckets(response.data.buckets);
+    } catch (error) {
+      console.error("Failed to fetch buckets:", error);
+      toast({
+        title: "获取 Bucket 列表失败",
+        description: "请检查网络连接或联系管理员",
+        status: "error",
+        duration: 5000,
+        isClosable: true,
+      });
+    } finally {
+      setIsLoadingBuckets(false);
+    }
+  }, [axiosInstance, authToken, toast]);
+
+  const fetchObjects = useCallback(async (bucketName: string) => {
+    if (!authToken || !bucketName) return;
+    setIsLoadingObjects(true);
+    try {
+      const response = await axiosInstance.get<ListObjectsResponse>("/objects", {
+        params: { bucket: bucketName }
+      });
+      setObjects(response.data.objects);
+    } catch (error) {
+      console.error("Failed to fetch objects:", error);
+      toast({
+        title: "获取对象列表失败",
+        description: "请检查网络连接或联系管理员",
+        status: "error",
+        duration: 5000,
+        isClosable: true,
+      });
+    } finally {
+      setIsLoadingObjects(false);
+    }
+  }, [axiosInstance, authToken, toast]);
+
   useEffect(() => {
     if (authToken) {
       fetchHistoryLinks();
+      fetchBuckets();
     }
-  }, [authToken, fetchHistoryLinks]);
+  }, [authToken, fetchHistoryLinks, fetchBuckets]);
+
+  // 当bucket选择变化时，获取对应的objects
+  useEffect(() => {
+    if (linkForm.bucket) {
+      fetchObjects(linkForm.bucket);
+    } else {
+      setObjects([]);
+    }
+  }, [linkForm.bucket, fetchObjects]);
 
   const handleLogin = useCallback(
     async (event: React.FormEvent<HTMLFormElement>) => {
@@ -208,12 +267,14 @@ const App = () => {
         };
         if (linkForm.bucket.trim()) {
           payload.bucket = linkForm.bucket.trim();
+          // 从选择的bucket中获取endpoint
+          const selectedBucket = buckets.find(b => b.name === linkForm.bucket.trim());
+          if (selectedBucket) {
+            payload.endpoint = selectedBucket.extranet_endpoint;
+          }
         }
         if (linkForm.downloadFilename.trim()) {
           payload.download_filename = linkForm.downloadFilename.trim();
-        }
-        if (linkForm.endpoint.trim()) {
-          payload.endpoint = linkForm.endpoint.trim();
         }
         if (enforceLimit) {
           if (!linkForm.maxDownloads || linkForm.maxDownloads <= 0) {
@@ -373,33 +434,58 @@ const App = () => {
       <VStack spacing={5} align="stretch">
         <FormControl>
           <FormLabel>Bucket</FormLabel>
-          <Input
-            value={linkForm.bucket}
-            onChange={(e) =>
-              setLinkForm((prev) => ({ ...prev, bucket: e.target.value }))
-            }
-            placeholder="可选，使用后端默认 bucket"
-          />
-        </FormControl>
-        <FormControl>
-          <FormLabel>OSS Endpoint</FormLabel>
-          <Input
-            value={linkForm.endpoint}
-            onChange={(e) =>
-              setLinkForm((prev) => ({ ...prev, endpoint: e.target.value }))
-            }
-            placeholder="可选，使用后端默认 endpoint"
-          />
+          <HStack>
+            <Select
+              value={linkForm.bucket}
+              onChange={(e) =>
+                setLinkForm((prev) => ({ ...prev, bucket: e.target.value }))
+              }
+              placeholder="选择 Bucket（可选，留空使用默认）"
+              isDisabled={isLoadingBuckets}
+            >
+              {buckets.map((bucket) => (
+                <option key={bucket.name} value={bucket.name}>
+                  {bucket.name} ({bucket.location})
+                </option>
+              ))}
+            </Select>
+            <IconButton
+              aria-label="刷新 Bucket 列表"
+              icon={<RepeatIcon />}
+              onClick={fetchBuckets}
+              isLoading={isLoadingBuckets}
+              size="md"
+              variant="outline"
+            />
+          </HStack>
         </FormControl>
         <FormControl isRequired>
           <FormLabel>对象键（Object Key）</FormLabel>
-          <Input
-            value={linkForm.objectKey}
-            onChange={(e) =>
-              setLinkForm((prev) => ({ ...prev, objectKey: e.target.value }))
-            }
-            placeholder="示例：path/to/file.pdf"
-          />
+          <HStack>
+            <Select
+              value={linkForm.objectKey}
+              onChange={(e) =>
+                setLinkForm((prev) => ({ ...prev, objectKey: e.target.value }))
+              }
+              placeholder={linkForm.bucket ? "选择对象..." : "请先选择 Bucket"}
+              isDisabled={!linkForm.bucket || isLoadingObjects}
+            >
+              {objects.map((obj) => (
+                <option key={obj.key} value={obj.key}>
+                  {obj.key} ({(obj.size / 1024 / 1024).toFixed(2)} MB)
+                </option>
+              ))}
+            </Select>
+            <IconButton
+              aria-label="刷新对象列表"
+              icon={<RepeatIcon />}
+              onClick={() => linkForm.bucket && fetchObjects(linkForm.bucket)}
+              isLoading={isLoadingObjects}
+              isDisabled={!linkForm.bucket}
+              size="md"
+              variant="outline"
+            />
+          </HStack>
         </FormControl>
         <FormControl>
           <FormLabel>下载文件名（可选）</FormLabel>

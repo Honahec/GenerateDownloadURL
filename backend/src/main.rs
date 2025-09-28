@@ -1,8 +1,8 @@
 mod auth;
 mod config;
 mod database;
+mod oss_client;
 mod routes;
-mod signing;
 mod state;
 
 use std::net::SocketAddr;

@@ -37,3 +37,29 @@ export interface ListLinksResponse {
   links: DownloadLinkResponse[];
   total: number;
 }
+
+export interface Bucket {
+  name: string;
+  location: string;
+  creation_date: string;
+  storage_class: string;
+  extranet_endpoint: string;
+  intranet_endpoint: string;
+}
+
+export interface ListBucketsResponse {
+  buckets: Bucket[];
+}
+
+export interface ObjectInfo {
+  key: string;
+  last_modified: string;
+  size: number;
+  storage_class: string;
+}
+
+export interface ListObjectsResponse {
+  objects: ObjectInfo[];
+  is_truncated: boolean;
+  next_marker?: string;
+}
