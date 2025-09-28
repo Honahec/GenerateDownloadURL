@@ -38,29 +38,15 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         format!("sqlite:{}", db_path.to_string_lossy())
     });
 
-    // 处理数据库 URL，确保使用绝对路径
-    let adjusted_url = if database_url.starts_with("sqlite:backend/") {
-        let current_dir = std::env::current_dir()?;
-        let db_path = current_dir.join("data").join("downloads.db");
-        format!("sqlite:{}", db_path.to_string_lossy())
-    } else if database_url.starts_with("sqlite:data/") {
-        let current_dir = std::env::current_dir()?;
-        let relative_path = database_url.strip_prefix("sqlite:").unwrap();
-        let db_path = current_dir.join(relative_path);
-        format!("sqlite:{}", db_path.to_string_lossy())
-    } else {
-        database_url
-    };
-
     // 确保数据库目录存在
-    if let Some(db_path) = adjusted_url.strip_prefix("sqlite:") {
+    if let Some(db_path) = database_url.strip_prefix("sqlite:") {
         let path = std::path::Path::new(db_path);
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
         }
     }
 
-    let database = Database::new(&adjusted_url).await?;
+    let database = Database::new(&database_url).await?;
 
     let state = AppState::new(config, database);
     let cors = build_cors_layer(state.config.as_ref());

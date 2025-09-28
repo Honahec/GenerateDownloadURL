@@ -28,7 +28,10 @@ impl Database {
         use sqlx::sqlite::SqliteConnectOptions;
         use std::str::FromStr;
 
-        let options = SqliteConnectOptions::from_str(database_url)?.create_if_missing(true);
+        let options = SqliteConnectOptions::from_str(database_url)?
+            .create_if_missing(true)
+            .journal_mode(sqlx::sqlite::SqliteJournalMode::Wal)
+            .synchronous(sqlx::sqlite::SqliteSynchronous::Normal);
         let pool = SqlitePool::connect_with(options).await?;
 
         sqlx::query(
