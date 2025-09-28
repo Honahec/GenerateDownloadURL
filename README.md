@@ -120,41 +120,6 @@ cd frontend
 pnpm run build    # 构建生产版本到 dist/ 目录
 ```
 
-## 快速部署
-
-### 一键部署脚本
-
-项目提供了自动化部署脚本，支持 Ubuntu/Debian 系统：
-
-```bash
-# 1. 克隆项目到服务器
-git clone <your-repo-url> /tmp/generate-download-url
-cd /tmp/generate-download-url
-
-# 2. 执行一键部署脚本
-sudo chmod +x deploy.sh
-sudo ./deploy.sh
-
-# 3. 配置 SSL 证书（可选）
-sudo chmod +x ssl-setup.sh
-sudo ./ssl-setup.sh
-```
-
-**部署脚本功能：**
-
-- 自动安装系统依赖（Rust, Node.js, pnpm, Nginx, SQLite）
-- 构建前后端应用
-- 创建系统服务（systemctl）
-- 配置 Nginx 反向代理
-
-### 域名配置要点
-
-- `gurl.honahec.cc`：前端静态文件 + 登录/签名 API 代理
-- `api.honahec.cc`：下载重定向服务
-- 同一个后端进程同时服务两个域名的不同功能
-- 确保 CORS 配置正确，允许跨域访问
-- SSL 证书配置（推荐使用 Let's Encrypt）
-
 ## 使用流程
 
 1. **访问管理页面**：打开 `https://gurl.honahec.cc`

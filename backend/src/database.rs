@@ -41,12 +41,18 @@ impl Database {
                 max_downloads INTEGER,
                 downloads_served INTEGER NOT NULL DEFAULT 0,
                 created_at TEXT NOT NULL,
-                download_filename TEXT
+                download_filename TEXT,
+                endpoint TEXT
             )
             "#,
         )
         .execute(&pool)
         .await?;
+
+        // Add endpoint column if it doesn't exist (for existing databases)
+        let _ = sqlx::query("ALTER TABLE download_links ADD COLUMN endpoint TEXT")
+            .execute(&pool)
+            .await;
 
         // 创建索引
         sqlx::query("CREATE INDEX IF NOT EXISTS idx_download_links_expires_at ON download_links(expires_at)")
