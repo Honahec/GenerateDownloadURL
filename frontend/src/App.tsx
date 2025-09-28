@@ -127,9 +127,10 @@ const App = () => {
     if (!authToken) return;
     try {
       const response = await axiosInstance.get<ListLinksResponse>("/links");
-      setHistoryLinks(response.data.links);
+      setHistoryLinks(response.data?.links || []);
     } catch (error) {
       console.error("Failed to fetch history links:", error);
+      setHistoryLinks([]);
     }
   }, [axiosInstance, authToken]);
 
@@ -138,9 +139,10 @@ const App = () => {
     setIsLoadingBuckets(true);
     try {
       const response = await axiosInstance.get<ListBucketsResponse>("/buckets");
-      setBuckets(response.data.buckets);
+      setBuckets(response.data?.buckets || []);
     } catch (error) {
       console.error("Failed to fetch buckets:", error);
+      setBuckets([]);
       toast({
         title: "获取 Bucket 列表失败",
         description: "请检查网络连接或联系管理员",
@@ -160,9 +162,10 @@ const App = () => {
       const response = await axiosInstance.get<ListObjectsResponse>("/objects", {
         params: { bucket: bucketName }
       });
-      setObjects(response.data.objects);
+      setObjects(response.data?.objects || []);
     } catch (error) {
       console.error("Failed to fetch objects:", error);
+      setObjects([]);
       toast({
         title: "获取对象列表失败",
         description: "请检查网络连接或联系管理员",
@@ -443,7 +446,7 @@ const App = () => {
               placeholder="选择 Bucket（可选，留空使用默认）"
               isDisabled={isLoadingBuckets}
             >
-              {buckets.map((bucket) => (
+              {buckets?.map((bucket) => (
                 <option key={bucket.name} value={bucket.name}>
                   {bucket.name} ({bucket.location})
                 </option>
@@ -470,7 +473,7 @@ const App = () => {
               placeholder={linkForm.bucket ? "选择对象..." : "请先选择 Bucket"}
               isDisabled={!linkForm.bucket || isLoadingObjects}
             >
-              {objects.map((obj) => (
+              {objects?.map((obj) => (
                 <option key={obj.key} value={obj.key}>
                   {obj.key} ({(obj.size / 1024 / 1024).toFixed(2)} MB)
                 </option>
@@ -566,11 +569,11 @@ const App = () => {
           size="sm"
         />
       </HStack>
-      {historyLinks.length === 0 ? (
+      {(historyLinks?.length || 0) === 0 ? (
         <Text color="gray.500">还没有生成链接。</Text>
       ) : (
         <Stack spacing={4} divider={<Divider />}>
-          {historyLinks.map((link) => (
+          {historyLinks?.map((link) => (
             <Box key={link.id}>
               <HStack spacing={3} align="flex-start">
                 <Box flex="1">
