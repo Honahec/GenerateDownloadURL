@@ -7,7 +7,7 @@ mod state;
 
 use std::net::SocketAddr;
 
-use axum::{Router, middleware::Next, extract::Request, response::Response};
+use axum::Router;
 use config::AppConfig;
 use dotenvy::dotenv;
 use tower_http::cors::{AllowMethods, AllowOrigin, CorsLayer};
@@ -38,7 +38,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         format!("sqlite:{}", db_path.to_string_lossy())
     });
 
-    println!("Database URL: {}", database_url);
+
 
     // 确保数据库目录存在
     if let Some(db_path) = database_url.strip_prefix("sqlite:") {
@@ -53,9 +53,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     let state = AppState::new(config, database);
     let cors = build_cors_layer(state.config.as_ref());
 
-    let app: Router = routes::create_router(state)
-        .layer(axum::middleware::from_fn(request_logger))
-        .layer(cors);
+    let app: Router = routes::create_router(state).layer(cors);
 
     let addr: SocketAddr = format!("{}:{}", api_host, api_port).parse()?;
     let listener = tokio::net::TcpListener::bind(addr).await?;
@@ -63,16 +61,6 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     axum::serve(listener, app).await?;
     Ok(())
-}
-
-async fn request_logger(req: Request, next: Next) -> Response {
-    let method = req.method().clone();
-    let path = req.uri().path().to_string();
-    println!("Request: {} {}", method, path);
-    
-    let response = next.run(req).await;
-    println!("Response for {} {}: {}", method, path, response.status());
-    response
 }
 
 fn build_cors_layer(config: &AppConfig) -> CorsLayer {

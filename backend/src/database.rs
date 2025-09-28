@@ -89,35 +89,24 @@ impl Database {
         let created_at_str = Utc::now().to_rfc3339();
         let max_downloads_i64 = max_downloads.map(|m| m as i64);
 
-        println!("Inserting into database: id={}, object_key={}", id.to_string(), object_key);
-        
-        let result = sqlx::query(
+        sqlx::query(
             r#"
             INSERT INTO download_links (id, object_key, bucket, expires_at, max_downloads, downloads_served, created_at, download_filename, endpoint)
             VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?)
             "#
         )
         .bind(id.to_string())
-        .bind(&object_key)
-        .bind(&bucket)
-        .bind(&expires_at_str)
+        .bind(object_key)
+        .bind(bucket)
+        .bind(expires_at_str)
         .bind(max_downloads_i64)
-        .bind(&created_at_str)
-        .bind(&download_filename)
-        .bind(&endpoint)
+        .bind(created_at_str)
+        .bind(download_filename)
+        .bind(endpoint)
         .execute(&self.pool)
-        .await;
+        .await?;
 
-        match result {
-            Ok(query_result) => {
-                println!("Database insert successful: rows_affected={}", query_result.rows_affected());
-                Ok(())
-            }
-            Err(e) => {
-                eprintln!("Database insert failed: {}", e);
-                Err(e.into())
-            }
-        }
+        Ok(())
     }
 
     pub async fn get_download_link(&self, id: &str) -> Result<Option<DownloadLink>> {
@@ -178,7 +167,6 @@ impl Database {
         let limit = limit.unwrap_or(50);
         let offset = offset.unwrap_or(0);
 
-        println!("Querying database with limit={}, offset={}", limit, offset);
         let rows = sqlx::query(
             "SELECT id, object_key, bucket, expires_at, max_downloads, downloads_served, created_at, download_filename, endpoint 
              FROM download_links 
@@ -190,13 +178,10 @@ impl Database {
         .fetch_all(&self.pool)
         .await?;
 
-        println!("Database query returned {} rows", rows.len());
         let now = Utc::now();
         let mut links = Vec::new();
 
         for row in rows {
-            let id: String = row.get("id");
-            println!("Processing row: id={}", id);
             let expires_at_str: String = row.get("expires_at");
             let created_at_str: String = row.get("created_at");
 
@@ -223,7 +208,6 @@ impl Database {
             });
         }
 
-        println!("Returning {} processed links", links.len());
         Ok(links)
     }
 
