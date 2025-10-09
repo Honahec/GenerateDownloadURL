@@ -61,5 +61,5 @@ export interface ObjectInfo {
 export interface ListObjectsResponse {
   objects: ObjectInfo[];
   is_truncated: boolean;
-  next_marker?: string;
+  next_continuation_token?: string;
 }

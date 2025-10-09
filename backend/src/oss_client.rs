@@ -91,7 +91,7 @@ pub struct ObjectInfo {
 pub struct ListObjectsResponse {
     pub objects: Vec<ObjectInfo>,
     pub is_truncated: bool,
-    pub next_marker: Option<String>,
+    pub next_continuation_token: Option<String>,
 }
 
 #[derive(Debug, Error)]
@@ -248,7 +248,7 @@ impl OssClient {
         &self,
         bucket_name: &str,
         prefix: Option<&str>,
-        marker: Option<&str>,
+        continuation_token: Option<&str>,
     ) -> Result<ListObjectsResponse, OssError> {
         let buckets_response = self.list_buckets().await?;
         let bucket = buckets_response
@@ -272,9 +272,8 @@ impl OssClient {
         if let Some(p) = prefix {
             query_params.insert("prefix".to_string(), p.to_string());
         }
-        if let Some(m) = marker {
-            // ListObjectsV2使用continuation-token而不是marker
-            query_params.insert("continuation-token".to_string(), m.to_string());
+        if let Some(token) = continuation_token {
+            query_params.insert("continuation-token".to_string(), token.to_string());
         }
         query_params.insert("max-keys".to_string(), "1000".to_string());
 
@@ -299,10 +298,10 @@ impl OssClient {
         
         // OSS子资源列表（只有这些查询参数才需要包含在签名中）
         let oss_sub_resources = [
-            "acl", "lifecycle", "location", "logging", "notification", "partNumber", 
-            "policy", "requestPayment", "torrent", "uploadId", "uploads", "versionId", 
+            "acl", "lifecycle", "location", "logging", "notification", "partNumber",
+            "policy", "requestPayment", "torrent", "uploadId", "uploads", "versionId",
             "versioning", "versions", "website", "cors", "delete", "restore", "tagging",
-            "encryption", "inventory", "select", "x-oss-process"
+            "encryption", "inventory", "select", "x-oss-process", "continuation-token",
         ];
         
         // 检查是否有OSS子资源需要包含在签名�?
@@ -319,7 +318,15 @@ impl OssClient {
             resource.push('?');
             let sorted_params: Vec<String> = sub_resource_params
                 .iter()
-                .map(|(k, v)| if v.is_empty() { k.clone() } else { format!("{}={}", k, v) })
+                .map(|(k, v)| {
+                    let encoded_key = percent_encode(k.as_bytes(), QUERY).to_string();
+                    if v.is_empty() {
+                        encoded_key
+                    } else {
+                        let encoded_value = percent_encode(v.as_bytes(), QUERY).to_string();
+                        format!("{}={}", encoded_key, encoded_value)
+                    }
+                })
                 .collect();
             resource.push_str(&sorted_params.join("&"));
             resource
@@ -632,8 +639,8 @@ impl OssClient {
         struct ListBucketResult {
             #[serde(rename = "IsTruncated")]
             is_truncated: bool,
-            #[serde(rename = "NextMarker")]
-            next_marker: Option<String>,
+            #[serde(rename = "NextContinuationToken")]
+            next_continuation_token: Option<String>,
             #[serde(rename = "Contents")]
             contents: Option<Vec<ObjectXml>>,
         }
@@ -668,7 +675,7 @@ impl OssClient {
         Ok(ListObjectsResponse {
             objects,
             is_truncated: parsed.is_truncated,
-            next_marker: parsed.next_marker,
+            next_continuation_token: parsed.next_continuation_token,
         })
     }
 }

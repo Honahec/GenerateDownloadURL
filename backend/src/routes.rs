@@ -403,7 +403,8 @@ async fn list_buckets(
 pub struct ListObjectsQuery {
     pub bucket: String,
     pub prefix: Option<String>,
-    pub marker: Option<String>,
+    #[serde(rename = "continuation-token")]
+    pub continuation_token: Option<String>,
 }
 
 async fn list_objects(
@@ -419,7 +420,11 @@ async fn list_objects(
         .map_err(|e| ApiError::Internal(format!("Failed to create OSS client: {}", e)))?;
     
     let response = client
-        .list_objects(&query.bucket, query.prefix.as_deref(), query.marker.as_deref())
+        .list_objects(
+            &query.bucket,
+            query.prefix.as_deref(),
+            query.continuation_token.as_deref(),
+        )
         .await
         .map_err(|e| ApiError::Internal(format!("Failed to list objects: {}", e)))?;
     

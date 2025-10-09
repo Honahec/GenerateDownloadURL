@@ -155,28 +155,57 @@ const App = () => {
     }
   }, [axiosInstance, authToken, toast]);
 
-  const fetchObjects = useCallback(async (bucketName: string) => {
-    if (!authToken || !bucketName) return;
-    setIsLoadingObjects(true);
-    try {
-      const response = await axiosInstance.get<ListObjectsResponse>("/objects", {
-        params: { bucket: bucketName }
-      });
-      setObjects(response.data?.objects || []);
-    } catch (error) {
-      console.error("Failed to fetch objects:", error);
-      setObjects([]);
-      toast({
-        title: "获取对象列表失败",
-        description: "请检查网络连接或联系管理员",
-        status: "error",
-        duration: 5000,
-        isClosable: true,
-      });
-    } finally {
-      setIsLoadingObjects(false);
-    }
-  }, [axiosInstance, authToken, toast]);
+  const fetchObjects = useCallback(
+    async (bucketName: string) => {
+      if (!authToken || !bucketName) return;
+      setIsLoadingObjects(true);
+      try {
+        const aggregatedObjects: ObjectInfo[] = [];
+        const MAX_PAGES = 100; // 避免意外的无限循环
+        let continuationToken: string | undefined;
+
+        for (let page = 0; page < MAX_PAGES; page += 1) {
+          const params: Record<string, string> = { bucket: bucketName };
+          if (continuationToken) {
+            params["continuation-token"] = continuationToken;
+          }
+
+          const { data } = await axiosInstance.get<ListObjectsResponse>(
+            "/objects",
+            { params }
+          );
+
+          if (!data) {
+            break;
+          }
+
+          aggregatedObjects.push(...data.objects);
+
+          if (data.is_truncated && data.next_continuation_token) {
+            continuationToken = data.next_continuation_token;
+          } else {
+            continuationToken = undefined;
+            break;
+          }
+        }
+
+        setObjects(aggregatedObjects);
+      } catch (error) {
+        console.error("Failed to fetch objects:", error);
+        setObjects([]);
+        toast({
+          title: "获取对象列表失败",
+          description: "请检查网络连接或联系管理员",
+          status: "error",
+          duration: 5000,
+          isClosable: true,
+        });
+      } finally {
+        setIsLoadingObjects(false);
+      }
+    },
+    [axiosInstance, authToken, toast]
+  );
 
   useEffect(() => {
     if (authToken) {
