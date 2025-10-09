@@ -1,7 +1,7 @@
 use axum::{
     Json, Router,
     extract::{Path, Query, State},
-    http::StatusCode,
+    http::{header, HeaderValue, StatusCode},
     response::{IntoResponse, Redirect},
     routing::{get, post},
 };
@@ -260,7 +260,7 @@ async fn list_links(
     _user: AuthUser,
     Query(params): Query<ListLinksQuery>,
     State(state): State<AppState>,
-) -> Result<Json<ListLinksResponse>, ApiError> {
+) -> Result<impl IntoResponse, ApiError> {
     let links = state
         .database
         .list_download_links(params.limit, params.offset)
@@ -288,10 +288,24 @@ async fn list_links(
         })
         .collect();
 
-    Ok(Json(ListLinksResponse {
+    let response = Json(ListLinksResponse {
         total: download_links.len(),
         links: download_links,
-    }))
+    });
+
+    let mut response = response.into_response();
+    response.headers_mut().insert(
+        header::CACHE_CONTROL,
+        HeaderValue::from_static("no-store, no-cache, must-revalidate"),
+    );
+    response
+        .headers_mut()
+        .insert(header::PRAGMA, HeaderValue::from_static("no-cache"));
+    response
+        .headers_mut()
+        .insert(header::EXPIRES, HeaderValue::from_static("0"));
+
+    Ok(response)
 }
 
 // 获取单个链接信息

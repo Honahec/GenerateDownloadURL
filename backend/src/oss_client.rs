@@ -127,7 +127,7 @@ pub fn build_signed_url(
 
     let expires = expires_at.timestamp();
 
-    let canonical_resource = format!("/{}/{}", bucket, encoded_key);
+    let canonical_resource = format!("/{}/{}", bucket, object_key);
     let mut additional_query = String::new();
     let canonical_oss_headers = String::new();
 
