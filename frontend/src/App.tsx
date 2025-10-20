@@ -140,7 +140,7 @@ const App = () => {
         setIsLoggingIn(true);
         try {
           const response = await axios.get<LoginResponse>(
-            `${API_CONFIG.BASE_URL}/oauth/callback`,
+            `${API_CONFIG.BASE_URL}/api/oauth/callback`,
             {
               params: {
                 code,

@@ -21,7 +21,7 @@ pub fn create_router(state: AppState) -> Router {
     Router::new()
         .route("/healthz", get(health_check))
         // OAuth2 认证路由
-        .route("/oauth/callback", get(oauth_callback))
+        .route("/api/oauth/callback", get(oauth_callback))
         // 前端域名路由 - gurl.honahec.cc (管理功能)
         .route("/sign", post(create_signed_link))
         .route("/buckets", get(list_buckets))
