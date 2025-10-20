@@ -42,16 +42,21 @@ import type {
   ListObjectsResponse,
   LoginResponse,
   ObjectInfo,
+  UserInfoResponse,
 } from "./types";
-import { API_CONFIG } from "./config";
+import { API_CONFIG, OAUTH_CONFIG } from "./config";
+import {
+  buildAuthorizeUrl,
+  generateCodeChallenge,
+  generateCodeVerifier,
+  generateState,
+  getAndClearOAuthSession,
+  storeOAuthSession,
+} from "./oauth";
 
 const TOKEN_STORAGE_KEY = "signed-download-token";
 const TOKEN_EXPIRY_STORAGE_KEY = "signed-download-token-exp";
-
-interface LoginFormState {
-  username: string;
-  password: string;
-}
+const USERNAME_STORAGE_KEY = "signed-download-username";
 
 interface LinkFormState {
   bucket: string;
@@ -60,11 +65,6 @@ interface LinkFormState {
   maxDownloads?: number;
   downloadFilename: string;
 }
-
-const initialLoginState: LoginFormState = {
-  username: "",
-  password: "",
-};
 
 const initialLinkFormState: LinkFormState = {
   bucket: "",
@@ -79,7 +79,7 @@ const App = () => {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const cancelRef = React.useRef<HTMLButtonElement>(null);
   const [authToken, setAuthToken] = useState<string | null>(null);
-  const [loginForm, setLoginForm] = useState<LoginFormState>(initialLoginState);
+  const [username, setUsername] = useState<string | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [linkForm, setLinkForm] = useState<LinkFormState>(initialLinkFormState);
   const [enforceLimit, setEnforceLimit] = useState(false);
@@ -97,16 +97,98 @@ const App = () => {
   useEffect(() => {
     const storedToken = localStorage.getItem(TOKEN_STORAGE_KEY);
     const storedExpiry = localStorage.getItem(TOKEN_EXPIRY_STORAGE_KEY);
+    const storedUsername = localStorage.getItem(USERNAME_STORAGE_KEY);
     if (storedToken && storedExpiry) {
       const expiresAt = Number(storedExpiry);
       if (Number.isFinite(expiresAt) && expiresAt > Date.now()) {
         setAuthToken(storedToken);
+        setUsername(storedUsername);
       } else {
         localStorage.removeItem(TOKEN_STORAGE_KEY);
         localStorage.removeItem(TOKEN_EXPIRY_STORAGE_KEY);
+        localStorage.removeItem(USERNAME_STORAGE_KEY);
       }
     }
-  }, []);
+
+    // 处理 OAuth2 回调
+    const handleOAuthCallback = async () => {
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get("code");
+      const state = params.get("state");
+
+      if (code && state) {
+        // 清除 URL 参数
+        window.history.replaceState(
+          {},
+          document.title,
+          window.location.pathname
+        );
+
+        // 获取存储的 OAuth session
+        const session = getAndClearOAuthSession();
+        if (!session || session.state !== state) {
+          toast({
+            title: "登录失败",
+            description: "OAuth2 状态验证失败，请重试。",
+            status: "error",
+            duration: 3000,
+            isClosable: true,
+          });
+          return;
+        }
+
+        setIsLoggingIn(true);
+        try {
+          const response = await axios.get<LoginResponse>(
+            `${API_CONFIG.BASE_URL}/oauth/callback`,
+            {
+              params: {
+                code,
+                state,
+                code_verifier: session.codeVerifier,
+              },
+            }
+          );
+
+          const {
+            token,
+            expires_in,
+            username: responseUsername,
+          } = response.data;
+          setAuthToken(token);
+          setUsername(responseUsername || null);
+
+          const expiresAt = Date.now() + expires_in * 1000;
+          localStorage.setItem(TOKEN_STORAGE_KEY, token);
+          localStorage.setItem(TOKEN_EXPIRY_STORAGE_KEY, String(expiresAt));
+          if (responseUsername) {
+            localStorage.setItem(USERNAME_STORAGE_KEY, responseUsername);
+          }
+
+          toast({
+            title: "登录成功",
+            description: `欢迎回来，${responseUsername || "用户"}！`,
+            status: "success",
+            duration: 2500,
+            isClosable: true,
+          });
+        } catch (error) {
+          console.error("OAuth callback error:", error);
+          toast({
+            title: "登录失败",
+            description: "OAuth2 认证失败，请重试。",
+            status: "error",
+            duration: 3000,
+            isClosable: true,
+          });
+        } finally {
+          setIsLoggingIn(false);
+        }
+      }
+    };
+
+    handleOAuthCallback();
+  }, [toast]);
 
   const axiosInstance = useMemo(() => {
     const instance = axios.create({
@@ -223,46 +305,34 @@ const App = () => {
     }
   }, [linkForm.bucket, fetchObjects]);
 
-  const handleLogin = useCallback(
-    async (event: React.FormEvent<HTMLFormElement>) => {
-      event.preventDefault();
-      setIsLoggingIn(true);
-      try {
-        const response = await axios.post<LoginResponse>(
-          `${API_CONFIG.BASE_URL}/login`,
-          loginForm
-        );
-        setAuthToken(response.data.token);
-        setLoginForm(initialLoginState);
-        const expiresAt = Date.now() + response.data.expires_in * 1000;
-        localStorage.setItem(TOKEN_STORAGE_KEY, response.data.token);
-        localStorage.setItem(TOKEN_EXPIRY_STORAGE_KEY, String(expiresAt));
-        toast({
-          title: "登录成功",
-          status: "success",
-          duration: 2500,
-          isClosable: true,
-        });
-      } catch (error) {
-        console.error(error);
-        toast({
-          title: "登录失败",
-          description: "请检查用户名和密码是否正确。",
-          status: "error",
-          duration: 3000,
-          isClosable: true,
-        });
-      } finally {
-        setIsLoggingIn(false);
-      }
-    },
-    [loginForm, toast]
-  );
+  const handleLogin = useCallback(async () => {
+    // 生成 PKCE 参数
+    const codeVerifier = generateCodeVerifier();
+    const codeChallenge = await generateCodeChallenge(codeVerifier);
+    const state = generateState();
+
+    // 存储到 sessionStorage
+    storeOAuthSession(state, codeVerifier);
+
+    // 构建授权 URL 并重定向
+    const authorizeUrl = buildAuthorizeUrl(
+      OAUTH_CONFIG.AUTHORIZE_URL,
+      OAUTH_CONFIG.CLIENT_ID,
+      OAUTH_CONFIG.REDIRECT_URI,
+      state,
+      codeChallenge,
+      OAUTH_CONFIG.SCOPE
+    );
+
+    window.location.href = authorizeUrl;
+  }, []);
 
   const handleLogout = useCallback(() => {
     setAuthToken(null);
+    setUsername(null);
     localStorage.removeItem(TOKEN_STORAGE_KEY);
     localStorage.removeItem(TOKEN_EXPIRY_STORAGE_KEY);
+    localStorage.removeItem(USERNAME_STORAGE_KEY);
     toast({
       title: "已退出登录",
       status: "info",
@@ -300,7 +370,9 @@ const App = () => {
         if (linkForm.bucket.trim()) {
           payload.bucket = linkForm.bucket.trim();
           // 从选择的bucket中获取endpoint
-          const selectedBucket = buckets.find(b => b.name === linkForm.bucket.trim());
+          const selectedBucket = buckets.find(
+            (b) => b.name === linkForm.bucket.trim()
+          );
           if (selectedBucket) {
             payload.endpoint = selectedBucket.extranet_endpoint;
           }
@@ -404,44 +476,21 @@ const App = () => {
   }, [axiosInstance, toast, fetchHistoryLinks, linkToDelete, onClose]);
 
   const renderLoginForm = () => (
-    <Box
-      as="form"
-      onSubmit={handleLogin}
-      bg="white"
-      boxShadow="md"
-      borderRadius="lg"
-      p={8}
-      w="100%"
-    >
+    <Box bg="white" boxShadow="md" borderRadius="lg" p={8} w="100%">
       <Heading size="md" mb={6} textAlign="center">
         管理员登录
       </Heading>
       <VStack spacing={4} align="stretch">
-        <FormControl isRequired>
-          <FormLabel>用户名</FormLabel>
-          <Input
-            value={loginForm.username}
-            onChange={(e) =>
-              setLoginForm((prev) => ({ ...prev, username: e.target.value }))
-            }
-            placeholder="请输入管理员用户名"
-            autoComplete="username"
-          />
-        </FormControl>
-        <FormControl isRequired>
-          <FormLabel>密码</FormLabel>
-          <Input
-            type="password"
-            value={loginForm.password}
-            onChange={(e) =>
-              setLoginForm((prev) => ({ ...prev, password: e.target.value }))
-            }
-            placeholder="请输入管理员密码"
-            autoComplete="current-password"
-          />
-        </FormControl>
-        <Button colorScheme="blue" type="submit" isLoading={isLoggingIn}>
-          登录
+        <Text textAlign="center" color="gray.600">
+          使用统一身份认证系统登录
+        </Text>
+        <Button
+          colorScheme="blue"
+          onClick={handleLogin}
+          isLoading={isLoggingIn}
+          size="lg"
+        >
+          使用 SSO 登录
         </Button>
       </VStack>
     </Box>
@@ -459,9 +508,16 @@ const App = () => {
       <Flex align="center" mb={6}>
         <Heading size="md">生成下载链接</Heading>
         <Spacer />
-        <Button size="sm" variant="outline" onClick={handleLogout}>
-          退出登录
-        </Button>
+        <HStack spacing={3}>
+          {username && (
+            <Text color="gray.600" fontSize="sm">
+              Hi {username}!
+            </Text>
+          )}
+          <Button size="sm" variant="outline" onClick={handleLogout}>
+            退出登录
+          </Button>
+        </HStack>
       </Flex>
       <VStack spacing={5} align="stretch">
         <FormControl>

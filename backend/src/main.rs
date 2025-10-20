@@ -1,6 +1,7 @@
 mod auth;
 mod config;
 mod database;
+mod oauth;
 mod oss_client;
 mod routes;
 mod state;
@@ -37,8 +38,6 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         let db_path = current_dir.join("data").join("downloads.db");
         format!("sqlite:{}", db_path.to_string_lossy())
     });
-
-
 
     // 确保数据库目录存在
     if let Some(db_path) = database_url.strip_prefix("sqlite:") {

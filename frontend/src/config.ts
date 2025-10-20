@@ -13,4 +13,22 @@ export const API_CONFIG = {
   DEFAULT_ALIYUN_DEFAULT_BUCKET: import.meta.env.VITE_ALIYUN_DEFAULT_BUCKET,
 };
 
+// OAuth2 配置
+export const OAUTH_CONFIG = {
+  // OAuth2 客户端 ID (必需，从环境变量读取)
+  CLIENT_ID: import.meta.env.VITE_OAUTH_CLIENT_ID,
+  // OAuth2 授权端点
+  AUTHORIZE_URL:
+    import.meta.env.VITE_OAUTH_AUTHORIZE_URL ||
+    "https://sso.honahec.cc/oauth/authorize",
+  // OAuth2 回调地址
+  REDIRECT_URI:
+    import.meta.env.VITE_OAUTH_REDIRECT_URI ||
+    (import.meta.env.PROD
+      ? "https://gurl.honahec.cc"
+      : "http://localhost:5173"),
+  // OAuth2 请求的权限范围
+  SCOPE: "username permissions",
+};
+
 export default API_CONFIG;

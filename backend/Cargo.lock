@@ -164,6 +164,7 @@ dependencies = [
  "jsonwebtoken",
  "percent-encoding",
  "quick-xml",
+ "rand",
  "reqwest",
  "serde",
  "serde_json",
@@ -174,6 +175,7 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "tower-http",
+ "url",
  "uuid",
 ]
 

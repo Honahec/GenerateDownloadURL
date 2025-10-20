@@ -16,8 +16,14 @@ pub struct AppConfig {
     pub default_expiry_secs: i64,
     pub jwt_secret: String,
     pub jwt_exp_minutes: i64,
-    pub admin_username: String,
-    pub admin_password: String,
+    pub oauth_client_id: String,
+    pub oauth_client_secret: String,
+    #[allow(dead_code)]
+    pub oauth_authorize_url: String,
+    pub oauth_token_url: String,
+    pub oauth_userinfo_url: String,
+    #[allow(dead_code)]
+    pub oauth_redirect_uri: String,
     pub cors_allowed_origins: Vec<String>,
 }
 
@@ -52,8 +58,16 @@ impl AppConfig {
         let default_expiry_secs = parse_with_default("DEFAULT_EXPIRY_SECS", 3600i64)?;
         let jwt_secret = require_env("JWT_SECRET")?;
         let jwt_exp_minutes = parse_with_default("JWT_EXP_MINUTES", 60i64)?;
-        let admin_username = require_env("ADMIN_USERNAME")?;
-        let admin_password = require_env("ADMIN_PASSWORD")?;
+
+        let oauth_client_id = require_env("OAUTH_CLIENT_ID")?;
+        let oauth_client_secret = require_env("OAUTH_CLIENT_SECRET")?;
+        let oauth_authorize_url = env::var("OAUTH_AUTHORIZE_URL")
+            .unwrap_or_else(|_| "https://sso.honahec.cc/oauth/authorize/".to_string());
+        let oauth_token_url = env::var("OAUTH_TOKEN_URL")
+            .unwrap_or_else(|_| "https://sso.honahec.cc/oauth/token/".to_string());
+        let oauth_userinfo_url = env::var("OAUTH_USERINFO_URL")
+            .unwrap_or_else(|_| "https://sso.honahec.cc/oauth/userinfo/".to_string());
+        let oauth_redirect_uri = require_env("OAUTH_REDIRECT_URI")?;
 
         let cors_allowed_origins = env::var("CORS_ALLOWED_ORIGINS")
             .map(|value| parse_origins(&value))
@@ -71,8 +85,12 @@ impl AppConfig {
             default_expiry_secs,
             jwt_secret,
             jwt_exp_minutes,
-            admin_username,
-            admin_password,
+            oauth_client_id,
+            oauth_client_secret,
+            oauth_authorize_url,
+            oauth_token_url,
+            oauth_userinfo_url,
+            oauth_redirect_uri,
             cors_allowed_origins,
         })
     }

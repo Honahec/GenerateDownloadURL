@@ -3,6 +3,8 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
+  // 设置 envDir 为上级目录，让 Vite 从根目录读取 .env 文件
+  envDir: "../",
   server: {
     port: 5173,
     proxy: {

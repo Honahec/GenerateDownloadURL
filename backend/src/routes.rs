@@ -1,7 +1,7 @@
 use axum::{
     Json, Router,
     extract::{Path, Query, State},
-    http::{header, HeaderValue, StatusCode},
+    http::{HeaderValue, StatusCode, header},
     response::{IntoResponse, Redirect},
     routing::{get, post},
 };
@@ -10,8 +10,9 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::auth::{AuthUser, generate_token};
+use crate::oauth::{OAuthError, check_admin_permission, exchange_code_for_token, fetch_user_info};
 use crate::oss_client::OssClient;
-use crate::oss_client::{build_signed_url, SigningError};
+use crate::oss_client::{SigningError, build_signed_url};
 use crate::state::{AppState, DownloadTicket};
 
 pub fn create_router(state: AppState) -> Router {
@@ -19,8 +20,9 @@ pub fn create_router(state: AppState) -> Router {
 
     Router::new()
         .route("/healthz", get(health_check))
+        // OAuth2 认证路由
+        .route("/oauth/callback", get(oauth_callback))
         // 前端域名路由 - gurl.honahec.cc (管理功能)
-        .route("/login", post(login))
         .route("/sign", post(create_signed_link))
         .route("/buckets", get(list_buckets))
         .route("/objects", get(list_objects))
@@ -41,32 +43,46 @@ async fn health_check() -> &'static str {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct LoginRequest {
-    pub username: String,
-    pub password: String,
+pub struct OAuthCallbackQuery {
+    pub code: String,
+    #[allow(dead_code)]
+    pub state: String,
+    pub code_verifier: String,
 }
 
 #[derive(Debug, Serialize)]
-pub struct LoginResponse {
+pub struct OAuthCallbackResponse {
     pub token: String,
     pub expires_in: i64,
+    pub username: String,
 }
 
-async fn login(
+// OAuth2 回调处理
+async fn oauth_callback(
     State(state): State<AppState>,
-    Json(payload): Json<LoginRequest>,
-) -> Result<Json<LoginResponse>, ApiError> {
-    let config = &state.config;
-    if payload.username != config.admin_username || payload.password != config.admin_password {
-        return Err(ApiError::Unauthorized);
-    }
+    Query(query): Query<OAuthCallbackQuery>,
+) -> Result<Json<OAuthCallbackResponse>, ApiError> {
+    // 交换授权码为访问令牌
+    let token_response = exchange_code_for_token(&state.config, &query.code, &query.code_verifier)
+        .await
+        .map_err(ApiError::OAuth)?;
 
-    let token = generate_token(&payload.username, config)
+    // 获取用户信息
+    let user_info = fetch_user_info(&state.config, &token_response.access_token)
+        .await
+        .map_err(ApiError::OAuth)?;
+
+    // 检查管理员权限
+    check_admin_permission(&user_info).map_err(ApiError::OAuth)?;
+
+    // 生成 JWT token
+    let jwt_token = generate_token(&user_info.username, &state.config)
         .map_err(|_| ApiError::Internal("Failed to generate token".to_string()))?;
 
-    Ok(Json(LoginResponse {
-        token,
-        expires_in: config.jwt_exp_minutes * 60,
+    Ok(Json(OAuthCallbackResponse {
+        token: jwt_token,
+        expires_in: state.config.jwt_exp_minutes * 60,
+        username: user_info.username,
     }))
 }
 
@@ -404,12 +420,12 @@ async fn list_buckets(
 ) -> Result<Json<crate::oss_client::ListBucketsResponse>, ApiError> {
     let client = OssClient::new(state.config.as_ref())
         .map_err(|e| ApiError::Internal(format!("Failed to create OSS client: {}", e)))?;
-    
+
     let response = client
         .list_buckets()
         .await
         .map_err(|e| ApiError::Internal(format!("Failed to list buckets: {}", e)))?;
-    
+
     Ok(Json(response))
 }
 
@@ -432,7 +448,7 @@ async fn list_objects(
 
     let client = OssClient::new(state.config.as_ref())
         .map_err(|e| ApiError::Internal(format!("Failed to create OSS client: {}", e)))?;
-    
+
     let response = client
         .list_objects(
             &query.bucket,
@@ -441,7 +457,7 @@ async fn list_objects(
         )
         .await
         .map_err(|e| ApiError::Internal(format!("Failed to list objects: {}", e)))?;
-    
+
     Ok(Json(response))
 }
 
@@ -451,7 +467,9 @@ pub enum ApiError {
     Internal(String),
     #[allow(dead_code)]
     Signing(SigningError),
+    #[allow(dead_code)]
     Unauthorized,
+    OAuth(OAuthError),
 }
 
 impl IntoResponse for ApiError {
@@ -461,6 +479,7 @@ impl IntoResponse for ApiError {
             ApiError::Internal(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg),
             ApiError::Signing(err) => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()),
             ApiError::Unauthorized => (StatusCode::UNAUTHORIZED, "Unauthorized".to_string()),
+            ApiError::OAuth(err) => (StatusCode::UNAUTHORIZED, err.to_string()),
         };
 
         #[derive(Serialize)]
