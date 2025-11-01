@@ -1,6 +1,6 @@
-// OAuth2 工具函数
+// OAuth2 utility functions
 
-// 生成随机字符串
+// Generate random string
 function generateRandomString(length: number): string {
   const charset =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
@@ -15,12 +15,12 @@ function generateRandomString(length: number): string {
   return result;
 }
 
-// 生成 code verifier
+// Generate code verifier
 export function generateCodeVerifier(): string {
   return generateRandomString(64);
 }
 
-// 生成 code challenge (SHA-256)
+// Generate code challenge (SHA-256)
 export async function generateCodeChallenge(verifier: string): Promise<string> {
   const encoder = new TextEncoder();
   const data = encoder.encode(verifier);
@@ -33,12 +33,12 @@ export async function generateCodeChallenge(verifier: string): Promise<string> {
     .replace(/=/g, "");
 }
 
-// 生成 state
+// Generate state
 export function generateState(): string {
   return generateRandomString(32);
 }
 
-// 构建授权 URL
+// Build authorization URL
 export function buildAuthorizeUrl(
   authorizeUrl: string,
   clientId: string,
@@ -60,13 +60,13 @@ export function buildAuthorizeUrl(
   return `${authorizeUrl}?${params.toString()}`;
 }
 
-// 存储 OAuth2 session
+// Store OAuth2 session
 export function storeOAuthSession(state: string, codeVerifier: string): void {
   sessionStorage.setItem("oauth_state", state);
   sessionStorage.setItem("oauth_code_verifier", codeVerifier);
 }
 
-// 获取并清除 OAuth2 session
+// Get and clear OAuth2 session
 export function getAndClearOAuthSession(): {
   state: string;
   codeVerifier: string;

@@ -44,7 +44,7 @@ const UNRESERVED: &AsciiSet = &CONTROLS
     .add(b'|')
     .add(b'}');
 
-// 用于查询参数编码
+// For query parameter encoding
 const QUERY: &AsciiSet = UNRESERVED;
 
 const PATH_ENCODE_SET: &AsciiSet = &NON_ALPHANUMERIC
@@ -218,7 +218,7 @@ impl OssClient {
         let date_header = now.format("%a, %d %b %Y %H:%M:%S GMT").to_string();
         let host = self.get_host();
 
-        // 使用OSS V1签名
+        // Use OSS V1 signature
         let authorization = self.build_v1_authorization("GET", "", "", &date_header, "", "/")?;
         let url = format!("https://{}", host);
 
@@ -262,12 +262,12 @@ impl OssClient {
         let now = Utc::now();
         let date_header = now.format("%a, %d %b %Y %H:%M:%S GMT").to_string();
 
-        // 使用三级域名格式：bucket-name.oss-region.aliyuncs.com
+        // Use third-level domain format: bucket-name.oss-region.aliyuncs.com
         let endpoint_host = self.extract_host_from_endpoint(&bucket.extranet_endpoint);
-        let host = format!("{}.{}", bucket_name, endpoint_host); // 三级域名
+        let host = format!("{}.{}", bucket_name, endpoint_host); // Third-level domain
 
         let mut query_params = BTreeMap::new();
-        // 使用ListObjectsV2 API
+        // Use ListObjectsV2 API
         query_params.insert("list-type".to_string(), "2".to_string());
         if let Some(p) = prefix {
             query_params.insert("prefix".to_string(), p.to_string());
@@ -277,7 +277,7 @@ impl OssClient {
         }
         query_params.insert("max-keys".to_string(), "1000".to_string());
 
-        // 构建HTTP请求的查询字符串（需要URL编码）
+        // Build HTTP request query string (requires URL encoding)
         let query_string = if query_params.is_empty() {
             String::new()
         } else {
@@ -290,13 +290,13 @@ impl OssClient {
             format!("?{}", encoded_params.join("&"))
         };
 
-        // 构建 CanonicalizedResource
-        // 根据OSS规范，对于虚拟主机风格的请求�?
-        // - 如果�?bucket.oss-region.aliyuncs.com，CanonicalizedResource = "/"
-        // - 只有OSS子资源才需要包含在签名�?
+        // Build CanonicalizedResource
+        // According to OSS specification, for virtual-hosted-style requests:
+        // - For bucket.oss-region.aliyuncs.com, CanonicalizedResource = "/"
+        // - Only OSS sub-resources need to be included in the signature
         let canonical_resource = format!("/{}/", bucket_name);
         
-        // OSS子资源列表（只有这些查询参数才需要包含在签名中）
+        // OSS sub-resource list (only these query parameters need to be included in the signature)
         let oss_sub_resources = [
             "acl", "lifecycle", "location", "logging", "notification", "partNumber",
             "policy", "requestPayment", "torrent", "uploadId", "uploads", "versionId",
@@ -304,7 +304,7 @@ impl OssClient {
             "encryption", "inventory", "select", "x-oss-process", "continuation-token",
         ];
         
-        // 检查是否有OSS子资源需要包含在签名�?
+        // Check if there are OSS sub-resources that need to be included in the signature
         let mut sub_resource_params = BTreeMap::new();
         for (key, value) in &query_params {
             if oss_sub_resources.contains(&key.as_str()) {
@@ -312,7 +312,7 @@ impl OssClient {
             }
         }
         
-        // 如果有OSS子资源，添加到canonical resource
+        // If there are OSS sub-resources, add them to canonical resource
         let final_canonical_resource = if !sub_resource_params.is_empty() {
             let mut resource = canonical_resource;
             resource.push('?');
@@ -381,7 +381,7 @@ impl OssClient {
             .to_string()
     }
 
-    /// 构建OSS V1签名的Authorization header
+    /// Build Authorization header for OSS V1 signature
     fn build_v1_authorization(
         &self,
         method: &str,
@@ -391,14 +391,14 @@ impl OssClient {
         canonical_oss_headers: &str,
         canonical_resource: &str,
     ) -> Result<String, OssError> {
-        // OSS V1签名规范
+        // OSS V1 signature specification
         // StringToSign = VERB + "\n" + CONTENT-MD5 + "\n" + CONTENT-TYPE + "\n" + DATE + "\n" + CanonicalizedOSSHeaders + CanonicalizedResource
         let string_to_sign = format!(
             "{}\n{}\n{}\n{}\n{}{}",
             method, content_md5, content_type, date, canonical_oss_headers, canonical_resource
         );
 
-        // 使用HMAC-SHA1计算签名
+        // Calculate signature using HMAC-SHA1
         let mut mac = HmacSha1::new_from_slice(self.access_key_secret.as_bytes())
             .map_err(|_| OssError::XmlParsingFailed("HMAC signing error".to_string()))?;
         mac.update(string_to_sign.as_bytes());
@@ -424,16 +424,16 @@ impl OssClient {
     ) -> Result<String, OssError> {
         let date_only = &iso_datetime[0..8];
 
-        // 提取region
+        // Extract region
         let region = self.extract_region_from_host(host);
 
-        // 1. 构建canonical_query_string - 对查询参数排序和URL编码
+        // 1. Build canonical_query_string - Sort and URL encode query parameters
         let canonical_query_string = self.build_canonical_query_string(query_string);
 
-        // 2. 构建canonical_headers - 规范化headers
+        // 2. Build canonical_headers - Normalize headers
         let mut headers = BTreeMap::new();
         
-        // 必选的headers - 所有x-oss-*头必须参与签名
+        // Required headers - All x-oss-* headers must participate in signing
         headers.insert("host".to_string(), host.to_string());
         headers.insert(
             "x-oss-content-sha256".to_string(),
@@ -441,7 +441,7 @@ impl OssClient {
         );
         headers.insert("x-oss-date".to_string(), iso_datetime.to_string());
 
-        // 添加额外的headers
+        // Add additional headers
         for (key, value) in additional_headers {
             headers.insert(key.to_lowercase(), value.trim().to_string());
         }
@@ -449,14 +449,14 @@ impl OssClient {
         let canonical_headers = self.build_canonical_headers(&headers);
         let signed_headers = self.build_signed_headers(&headers);
 
-        // 3. 构建canonical_request
-        // 格式：HTTPMethod\nURI\nQuery\nHeaders\nSignedHeaders\nPayload
+        // 3. Build canonical_request
+        // Format: HTTPMethod\nURI\nQuery\nHeaders\nSignedHeaders\nPayload
         let canonical_request = format!(
             "{}\n{}\n{}\n{}\n{}\nUNSIGNED-PAYLOAD",
             method, path, canonical_query_string, canonical_headers, signed_headers
         );
 
-        // 4. 构建string_to_sign
+        // 4. Build string_to_sign
         let credential_scope = format!("{}/{}/oss/aliyun_v4_request", date_only, region);
         let string_to_sign = format!(
             "OSS4-HMAC-SHA256\n{}\n{}\n{}",
@@ -465,12 +465,12 @@ impl OssClient {
             digest(&canonical_request)
         );
 
-        // 5. 计算签名
+        // 5. Calculate signature
         let signing_key = self.get_v4_signing_key(date_only, &region)?;
         let signature = hmac_sha256(&signing_key, string_to_sign.as_bytes());
         let signature_hex = hex::encode(signature);
 
-        // 6. 构建Authorization header - 使用AdditionalHeaders而不是signed_headers
+        // 6. Build Authorization header - Use AdditionalHeaders instead of signed_headers
         let additional_headers_str = self.build_additional_headers(&headers);
         let mut authorization = format!(
             "OSS4-HMAC-SHA256 Credential={}/{}, Signature={}",
@@ -495,7 +495,7 @@ impl OssClient {
                 }
             }
         }
-        "cn-hangzhou".to_string() // 默认region
+        "cn-hangzhou".to_string() // Default region
     }
 
     fn build_canonical_query_string(&self, query_string: &str) -> String {
@@ -519,12 +519,12 @@ impl OssClient {
                 let key = &param[..eq_pos];
                 let value = &param[eq_pos + 1..];
                 
-                // 直接使用RFC 3986标准进行URL编码，不进行解码
+                // Use RFC 3986 standard for URL encoding directly, without decoding
                 let encoded_key = percent_encode(key.as_bytes(), QUERY).to_string();
                 let encoded_value = percent_encode(value.as_bytes(), QUERY).to_string();
                 params.insert(encoded_key, encoded_value);
             } else {
-                // 没有值的参数
+                // Parameters without values
                 let encoded_key = percent_encode(param.as_bytes(), QUERY).to_string();
                 params.insert(encoded_key, String::new());
             }
@@ -557,13 +557,13 @@ impl OssClient {
         sorted_keys.join(";")
     }
 
-    /// 构建AdditionalHeaders - 和SignedHeaders内容一�?
+    /// Build AdditionalHeaders - Same content as SignedHeaders
     fn build_additional_headers(&self, headers: &BTreeMap<String, String>) -> String {
         self.build_signed_headers(headers)
     }
 
     fn get_v4_signing_key(&self, date: &str, region: &str) -> Result<Vec<u8>, OssError> {
-        // OSS V4 签名密钥派生算法
+        // OSS V4 signature key derivation algorithm
         // kSecret = your secret access key
         // kDate = HMAC("aliyun_v4" + kSecret, Date)
         // kRegion = HMAC(kDate, Region) 

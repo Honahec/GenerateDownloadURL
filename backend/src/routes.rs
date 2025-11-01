@@ -20,9 +20,9 @@ pub fn create_router(state: AppState) -> Router {
 
     Router::new()
         .route("/healthz", get(health_check))
-        // OAuth2 认证路由
+        // OAuth2 authentication routes
         .route("/api/oauth/callback", get(oauth_callback))
-        // 前端域名路由 - gurl.honahec.cc (管理功能)
+        // Frontend domain routes - gurl.honahec.cc (management functions)
         .route("/sign", post(create_signed_link))
         .route("/buckets", get(list_buckets))
         .route("/objects", get(list_objects))
@@ -30,7 +30,7 @@ pub fn create_router(state: AppState) -> Router {
         .route("/links/:id", get(get_link_info))
         .route("/links/:id", axum::routing::delete(delete_link))
         .route("/cleanup", post(cleanup_expired_links))
-        // 后端域名路由 - api.honahec.cc (公共访问)
+        // Backend domain routes - api.honahec.cc (public access)
         .nest(
             &download_prefix,
             Router::new().route("/:id", get(resolve_download)),
@@ -57,25 +57,25 @@ pub struct OAuthCallbackResponse {
     pub username: String,
 }
 
-// OAuth2 回调处理
+// OAuth2 callback handler
 async fn oauth_callback(
     State(state): State<AppState>,
     Query(query): Query<OAuthCallbackQuery>,
 ) -> Result<Json<OAuthCallbackResponse>, ApiError> {
-    // 交换授权码为访问令牌
+    // Exchange authorization code for access token
     let token_response = exchange_code_for_token(&state.config, &query.code, &query.code_verifier)
         .await
         .map_err(ApiError::OAuth)?;
 
-    // 获取用户信息
+    // Fetch user information
     let user_info = fetch_user_info(&state.config, &token_response.access_token)
         .await
         .map_err(ApiError::OAuth)?;
 
-    // 检查管理员权限
+    // Check admin permission
     check_admin_permission(&user_info).map_err(ApiError::OAuth)?;
 
-    // 生成 JWT token
+    // Generate JWT token
     let jwt_token = generate_token(&user_info.username, &state.config)
         .map_err(|_| ApiError::Internal("Failed to generate token".to_string()))?;
 
@@ -174,7 +174,7 @@ async fn create_signed_link(
         endpoint_override: payload.endpoint.clone(),
     };
 
-    // 存储到数据库
+    // Store to database
     state
         .database
         .create_download_link(
@@ -189,7 +189,7 @@ async fn create_signed_link(
         .await
         .map_err(|e| ApiError::Internal(format!("Database error: {}", e)))?;
 
-    // 存储票据到内存
+    // Store ticket to memory
     {
         let mut tickets = state.tickets.write().await;
         tickets.insert(id, ticket);
@@ -215,18 +215,18 @@ async fn resolve_download(
 ) -> Result<Redirect, (StatusCode, String)> {
     let now = Utc::now();
 
-    // 获取票据
+    // Get ticket
     let tickets = state.tickets.read().await;
     let ticket = tickets
         .get(&id)
         .ok_or_else(|| (StatusCode::NOT_FOUND, "Download link not found".to_string()))?;
 
-    // 检查是否过期
+    // Check if expired
     if now > ticket.expires_at {
         return Err((StatusCode::GONE, "Download link has expired".to_string()));
     }
 
-    // 检查下载次数限制
+    // Check download count limit
     if let Some(max_downloads) = ticket.max_downloads {
         if ticket.downloads_served >= max_downloads {
             return Err((
@@ -238,21 +238,21 @@ async fn resolve_download(
 
     drop(tickets);
 
-    // 更新下载次数
+    // Update download count
     let mut tickets_mut = state.tickets.write().await;
     if let Some(ticket_mut) = tickets_mut.get_mut(&id) {
         ticket_mut.downloads_served += 1;
     }
     drop(tickets_mut);
 
-    // 更新数据库中的下载计数
+    // Update download count in database
     let _ = state.database.increment_downloads(&id.to_string()).await;
 
-    // 重新获取票据信息用于生成签名URL
+    // Re-fetch ticket info for generating signed URL
     let tickets = state.tickets.read().await;
     let ticket = tickets.get(&id).unwrap();
 
-    // 生成签名的下载URL
+    // Generate signed download URL
     let signed_url = build_signed_url(
         &state.config,
         ticket.bucket_override.as_deref(),
@@ -271,7 +271,7 @@ async fn resolve_download(
     Ok(Redirect::temporary(&signed_url.url))
 }
 
-// 获取链接列表
+// Get links list
 async fn list_links(
     _user: AuthUser,
     Query(params): Query<ListLinksQuery>,
@@ -324,7 +324,7 @@ async fn list_links(
     Ok(response)
 }
 
-// 获取单个链接信息
+// Get single link info
 async fn get_link_info(
     _user: AuthUser,
     Path(id): Path<String>,
@@ -358,7 +358,7 @@ async fn get_link_info(
     Ok(Json(response))
 }
 
-// 删除链接
+// Delete link
 async fn delete_link(
     _user: AuthUser,
     Path(id): Path<String>,
@@ -371,7 +371,7 @@ async fn delete_link(
         .map_err(|e| ApiError::Internal(format!("Database error: {}", e)))?;
 
     if deleted {
-        // 同时从内存中删除
+        // Also remove from memory
         if let Ok(uuid) = Uuid::parse_str(&id) {
             let mut tickets = state.tickets.write().await;
             tickets.remove(&uuid);
@@ -389,7 +389,7 @@ async fn delete_link(
     }
 }
 
-// 清理过期链接
+// Clean up expired links
 async fn cleanup_expired_links(
     _user: AuthUser,
     State(state): State<AppState>,
@@ -400,7 +400,7 @@ async fn cleanup_expired_links(
         .await
         .map_err(|e| ApiError::Internal(format!("Database error: {}", e)))?;
 
-    // 同时清理内存中的过期票据
+    // Also clean up expired tickets in memory
     let now = Utc::now();
     let mut tickets = state.tickets.write().await;
     tickets.retain(|_, ticket| {
