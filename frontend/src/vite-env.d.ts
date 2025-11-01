@@ -2,7 +2,7 @@
 
 interface ImportMetaEnv {
   readonly VITE_API_BASE_URL?: string;
-  // 可以添加更多环境变量
+  // You can add more environment variables here
 }
 
 interface ImportMeta {

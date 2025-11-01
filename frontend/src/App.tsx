@@ -110,21 +110,21 @@ const App = () => {
       }
     }
 
-    // 处理 OAuth2 回调
+    // Handle OAuth2 callback
     const handleOAuthCallback = async () => {
       const params = new URLSearchParams(window.location.search);
       const code = params.get("code");
       const state = params.get("state");
 
       if (code && state) {
-        // 清除 URL 参数
+        // Clear URL parameters
         window.history.replaceState(
           {},
           document.title,
           window.location.pathname
         );
 
-        // 获取存储的 OAuth session
+        // Get stored OAuth session
         const session = getAndClearOAuthSession();
         if (!session || session.state !== state) {
           toast({
@@ -243,7 +243,7 @@ const App = () => {
       setIsLoadingObjects(true);
       try {
         const aggregatedObjects: ObjectInfo[] = [];
-        const MAX_PAGES = 100; // 避免意外的无限循环
+        const MAX_PAGES = 100; // Prevent accidental infinite loops
         let continuationToken: string | undefined;
 
         for (let page = 0; page < MAX_PAGES; page += 1) {
@@ -296,7 +296,7 @@ const App = () => {
     }
   }, [authToken, fetchHistoryLinks, fetchBuckets]);
 
-  // 当bucket选择变化时，获取对应的objects
+  // Fetch corresponding objects when bucket selection changes
   useEffect(() => {
     if (linkForm.bucket) {
       fetchObjects(linkForm.bucket);
@@ -306,15 +306,15 @@ const App = () => {
   }, [linkForm.bucket, fetchObjects]);
 
   const handleLogin = useCallback(async () => {
-    // 生成 PKCE 参数
+    // Generate PKCE parameters
     const codeVerifier = generateCodeVerifier();
     const codeChallenge = await generateCodeChallenge(codeVerifier);
     const state = generateState();
 
-    // 存储到 sessionStorage
+    // Store to sessionStorage
     storeOAuthSession(state, codeVerifier);
 
-    // 构建授权 URL 并重定向
+    // Build authorization URL and redirect
     const authorizeUrl = buildAuthorizeUrl(
       OAUTH_CONFIG.AUTHORIZE_URL,
       OAUTH_CONFIG.CLIENT_ID,
@@ -369,7 +369,7 @@ const App = () => {
         };
         if (linkForm.bucket.trim()) {
           payload.bucket = linkForm.bucket.trim();
-          // 从选择的bucket中获取endpoint
+          // Get endpoint from selected bucket
           const selectedBucket = buckets.find(
             (b) => b.name === linkForm.bucket.trim()
           );
@@ -397,7 +397,7 @@ const App = () => {
           payload
         );
         setLinks((prev) => [response.data, ...prev]);
-        // 刷新历史链接列表
+        // Refresh history links list
         fetchHistoryLinks();
         toast({
           title: "下载链接生成成功",
@@ -458,7 +458,7 @@ const App = () => {
         duration: 2000,
         isClosable: true,
       });
-      // 刷新历史链接列表
+      // Refresh history links list
       fetchHistoryLinks();
     } catch (error) {
       console.error(error);
@@ -679,14 +679,14 @@ const App = () => {
                     创建时间：{new Date(link.created_at).toLocaleString()}
                   </Text>
                   <HStack spacing={2} mt={2}>
-                    {/* 状态标签 */}
+                    {/* Status badge */}
                     {link.is_expired ? (
                       <Badge colorScheme="red">已过期</Badge>
                     ) : (
                       <Badge colorScheme="green">有效</Badge>
                     )}
 
-                    {/* 使用次数标签 */}
+                    {/* Usage count badge */}
                     {link.max_downloads ? (
                       <Badge
                         colorScheme={
@@ -784,7 +784,7 @@ const App = () => {
         </VStack>
       </Container>
 
-      {/* 确认删除对话框 */}
+      {/* Confirm delete dialog */}
       <AlertDialog
         isOpen={isOpen}
         leastDestructiveRef={cancelRef}

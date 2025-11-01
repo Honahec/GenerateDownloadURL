@@ -24,7 +24,7 @@ async fn main() {
 }
 
 async fn run() -> Result<(), Box<dyn std::error::Error>> {
-    // 尝试从当前目录和父目录加载 .env 文件
+    // Try to load .env file from current and parent directories
     dotenv().ok();
     dotenvy::from_path("../.env").ok();
 
@@ -32,14 +32,14 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     let api_host = config.api_host.clone();
     let api_port = config.api_port;
 
-    // 初始化数据库
+    // Initialize database
     let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
         let current_dir = std::env::current_dir().unwrap();
         let db_path = current_dir.join("data").join("downloads.db");
         format!("sqlite:{}", db_path.to_string_lossy())
     });
 
-    // 确保数据库目录存在
+    // Ensure database directory exists
     if let Some(db_path) = database_url.strip_prefix("sqlite:") {
         let path = std::path::Path::new(db_path);
         if let Some(parent) = path.parent() {

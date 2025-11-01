@@ -57,7 +57,7 @@ impl Database {
             .execute(&pool)
             .await;
 
-        // 创建索引
+        // Create indexes
         sqlx::query("CREATE INDEX IF NOT EXISTS idx_download_links_expires_at ON download_links(expires_at)")
             .execute(&pool)
             .await?;
@@ -66,11 +66,11 @@ impl Database {
             .execute(&pool)
             .await?;
 
-        // 第二个迁移：添加 endpoint 列（如果不存在）
+        // Second migration: Add endpoint column (if it doesn't exist)
         sqlx::query("ALTER TABLE download_links ADD COLUMN endpoint TEXT")
             .execute(&pool)
             .await
-            .ok(); // 忽略错误，因为列可能已经存在
+            .ok(); // Ignore errors as the column may already exist
 
         Ok(Self { pool })
     }
